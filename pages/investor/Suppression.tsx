@@ -1,12 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { Shield, Upload, FileSpreadsheet, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { api } from '../../services/mockBackend';
 import { SuppressionList } from '../../types';
+import { Toast } from '../../components/ui/Toast';
 
 export const SuppressionManagement = () => {
   const [lists, setLists] = useState<SuppressionList[]>([]);
   const [loading, setLoading] = useState(true);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchLists = async () => {
@@ -17,10 +20,37 @@ export const SuppressionManagement = () => {
     fetchLists();
   }, []);
 
-  if (loading) return <div className="text-emerald-500 animate-pulse font-mono p-12 text-center">Loading Suppression Data...</div>;
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Simulate upload and parsing delay
+      setLoading(true);
+      setTimeout(() => {
+        const newList: SuppressionList = {
+          id: Math.floor(Math.random() * 10000) + 100,
+          clientId: 201,
+          fileName: file.name,
+          suppressionType: 'phone', // Defaulting for demo
+          recordCount: Math.floor(Math.random() * 900) + 100,
+          isActive: true,
+          createdAt: new Date().toISOString()
+        };
+        
+        setLists(prev => [newList, ...prev]);
+        setToastMessage('Suppression list uploaded successfully');
+        setLoading(false);
+      }, 1000);
+    }
+    // Reset input
+    e.target.value = '';
+  };
+
+  if (loading && lists.length === 0) return <div className="text-emerald-500 animate-pulse font-mono p-12 text-center">Loading Suppression Data...</div>;
 
   return (
     <div className="space-y-8 pb-12">
+      {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
+      
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/5 pb-6">
         <div>
@@ -54,7 +84,17 @@ export const SuppressionManagement = () => {
                <p className="text-xs text-gray-500 font-mono mb-6 uppercase tracking-wide">
                    SUPPORTED COLUMN HINTS: (PHONE, ADDRESS, OWNER_NAME)
                </p>
-               <button className="px-6 py-3 bg-[#1A1A1A] hover:bg-[#252525] border border-white/10 rounded-lg text-sm font-bold text-white uppercase tracking-wider transition-all flex items-center gap-2">
+               <input 
+                 type="file" 
+                 accept=".csv"
+                 ref={fileInputRef}
+                 onChange={handleFileSelect}
+                 className="hidden"
+               />
+               <button 
+                 onClick={() => fileInputRef.current?.click()}
+                 className="px-6 py-3 bg-[#1A1A1A] hover:bg-[#252525] border border-white/10 rounded-lg text-sm font-bold text-white uppercase tracking-wider transition-all flex items-center gap-2"
+               >
                    <FileSpreadsheet size={16} className="text-emerald-500" />
                    Browse CSV Files
                </button>

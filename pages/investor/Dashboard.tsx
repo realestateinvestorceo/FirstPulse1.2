@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
@@ -9,7 +8,6 @@ import {
   Download, 
   Flame, 
   CheckCircle2, 
-  DollarSign, 
   ArrowRight,
   AlertTriangle,
   Loader2,
@@ -17,7 +15,8 @@ import {
   Users,
   Search,
   Map,
-  TrendingUp
+  TrendingUp,
+  Clock
 } from 'lucide-react';
 
 const Counter = ({ label, value, brightness = 'text-white' }: { label: string; value: string; brightness?: string }) => (
@@ -180,17 +179,6 @@ export const InvestorDashboard = () => {
                         </span>
                     </div>
                 </div>
-                <Card className="bg-[#111111] border-white/10 min-w-[200px]">
-                    <div className="px-5 py-4 flex items-center gap-4">
-                        <div className="p-2.5 rounded-lg bg-white/5 text-emerald-500">
-                            <DollarSign size={20} />
-                        </div>
-                        <div>
-                            <div className="text-[10px] text-gray-500 uppercase tracking-wider font-bold mb-0.5">Wallet Balance</div>
-                            <div className="text-xl font-mono text-white font-bold">${walletBalance.toFixed(2)}</div>
-                        </div>
-                    </div>
-                </Card>
             </div>
 
             {/* Row 1: Primary Action & Hot Sheet */}
@@ -266,10 +254,10 @@ export const InvestorDashboard = () => {
                             
                             <div className="mt-8">
                                 <div className="text-7xl font-mono font-bold text-white mb-2 tracking-tighter">
-                                    {latestBatch ? latestBatch.blitzCount + latestBatch.freshCount : '--'}
+                                    {latestBatch ? latestBatch.blitzCount : '--'}
                                 </div>
                                 <div className="inline-block px-3 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-500 tracking-widest uppercase">
-                                    Hot Subset
+                                    Blitz Lane Active
                                 </div>
                             </div>
                         </div>
@@ -308,4 +296,151 @@ export const InvestorDashboard = () => {
                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                           {VELOCITY_DATA.map(item => (
                               <Card key={item.zip} className={`bg-[#111111] border ${item.border} p-3 flex flex-col items-center justify-center text-center hover:bg-white/5 transition-colors`}>
-                                  <div className="text-lg font-mono font
+                                  <div className="text-lg font-mono font-bold text-white mb-1">{item.zip}</div>
+                                  <div className={`text-[10px] font-bold ${item.text} ${item.bg} px-2 py-0.5 rounded border ${item.border} uppercase`}>
+                                      {item.status}
+                                  </div>
+                              </Card>
+                          ))}
+                     </div>
+                </div>
+                
+                {/* Sold Pulse */}
+                <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-4 ml-1">
+                        <TrendingUp size={16} className="text-gray-500" />
+                        <h3 className="text-xs font-bold text-gray-500 tracking-widest uppercase">Sold Pulse</h3>
+                    </div>
+                    <Card className="bg-[#111111] border-white/5 p-0 overflow-hidden">
+                        {SOLD_PULSE_DATA.map((item, i) => (
+                            <div key={i} className="p-4 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors flex justify-between items-center">
+                                <div>
+                                    <div className="text-sm font-bold text-white">{item.address}</div>
+                                    <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                                        <Clock size={10} />
+                                        {item.time}
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-sm font-mono font-bold text-emerald-500">${item.price.toLocaleString()}</div>
+                                    <div className="text-[10px] text-gray-600 font-bold uppercase">Sold</div>
+                                </div>
+                            </div>
+                        ))}
+                    </Card>
+                </div>
+            </div>
+
+            {/* Modal for Execution */}
+            <Modal 
+                isOpen={isModalOpen} 
+                onClose={() => setIsModalOpen(false)} 
+                title="Confirm Weekly Batch Execution"
+                icon={<FileDown className="text-emerald-500" />}
+            >
+                <div className="space-y-6">
+                    {/* Info Boxes */}
+                    {latestBatch && (
+                        <div className="grid grid-cols-2 gap-4">
+                             <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+                                 <div className="text-[10px] text-gray-500 uppercase font-bold">Total Records</div>
+                                 <div className="text-xl font-mono text-white font-bold">{latestBatch.totalRecords}</div>
+                             </div>
+                             <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+                                 <div className="text-[10px] text-gray-500 uppercase font-bold">Est. Fresh</div>
+                                 <div className="text-xl font-mono text-emerald-500 font-bold">{latestBatch.freshCount}</div>
+                             </div>
+                        </div>
+                    )}
+
+                    {/* Skip Trace Section */}
+                    <div className="p-4 bg-[#0A0A0A] border border-white/10 rounded-xl">
+                         <div className="flex justify-between items-start mb-4">
+                             <div>
+                                 <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                                     <Search size={14} className="text-emerald-500" />
+                                     Skip Trace Enrichment
+                                 </h4>
+                                 <p className="text-xs text-gray-500 mt-1">Append phone numbers/emails to fresh records.</p>
+                             </div>
+                             <div className={`w-10 h-6 rounded-full p-1 flex items-center cursor-pointer transition-colors ${includeSkipTrace ? 'bg-emerald-600' : 'bg-gray-700'}`} onClick={() => setIncludeSkipTrace(!includeSkipTrace)}>
+                                 <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${includeSkipTrace ? 'translate-x-4' : 'translate-x-0'}`} />
+                             </div>
+                         </div>
+
+                         {includeSkipTrace && traceEstimate && (
+                             <div className="pt-4 border-t border-white/10 space-y-2">
+                                 <div className="flex justify-between text-xs">
+                                     <span className="text-gray-400">Eligible for Trace</span>
+                                     <span className="text-white font-mono">{traceEstimate.eligibleCount}</span>
+                                 </div>
+                                 <div className="flex justify-between text-xs">
+                                     <span className="text-gray-400">Est. Cost ({traceEstimate.rate}/record)</span>
+                                     <span className="text-emerald-500 font-mono font-bold">${traceEstimate.totalCost.toFixed(2)}</span>
+                                 </div>
+                                 {walletBalance < traceEstimate.totalCost && (
+                                     <div className="mt-2 text-xs text-red-500 flex items-center gap-1.5 bg-red-500/10 p-2 rounded">
+                                         <AlertTriangle size={12} />
+                                         Insufficient Wallet Balance
+                                     </div>
+                                 )}
+                             </div>
+                         )}
+                    </div>
+                    
+                    {/* Warning Section */}
+                    <div className="p-4 bg-rose-950/20 border border-rose-500/30 rounded-xl flex gap-3">
+                         <AlertTriangle className="text-rose-500 shrink-0" size={20} />
+                         <div className="text-xs text-rose-200/80 leading-relaxed">
+                             <strong className="text-rose-400 block mb-1">Execution Lock-In</strong>
+                             Once downloaded, touch counts are permanently incremented and cadence timers begin. This action cannot be undone.
+                         </div>
+                    </div>
+
+                     {/* Deduplication Info */}
+                    <div className="p-3 bg-blue-900/10 border border-blue-500/20 rounded-lg flex gap-2 items-start">
+                        <Users size={16} className="text-blue-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-blue-300/80 leading-relaxed">
+                            <strong className="text-blue-400">Deduplication Protocol Active:</strong> {latestBatch?.duplicateContactsAvoided || 0} duplicate contacts consolidated. Owners with multiple properties will only receive marketing for their highest-priority asset.
+                        </p>
+                    </div>
+
+                    {/* Confirmation */}
+                    <div className="flex items-center gap-3 pt-2">
+                        <div 
+                            className={`w-5 h-5 rounded border flex items-center justify-center cursor-pointer ${isConfirmed ? 'bg-emerald-500 border-emerald-500' : 'border-gray-600 hover:border-gray-500'}`}
+                            onClick={() => setIsConfirmed(!isConfirmed)}
+                        >
+                            {isConfirmed && <CheckCircle2 size={14} className="text-black" />}
+                        </div>
+                        <span className="text-xs text-gray-400 cursor-pointer select-none" onClick={() => setIsConfirmed(!isConfirmed)}>
+                            I confirm I am ready to process this batch.
+                        </span>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="grid grid-cols-2 gap-4 pt-4">
+                        <button 
+                            onClick={() => setIsModalOpen(false)}
+                            className="py-3 rounded-lg border border-white/10 text-gray-400 font-bold text-sm hover:bg-white/5 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            onClick={executeBatch}
+                            disabled={!isConfirmed || isProcessing || (includeSkipTrace && traceEstimate && walletBalance < traceEstimate.totalCost)}
+                            className={`py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-colors ${
+                                !isConfirmed || isProcessing || (includeSkipTrace && traceEstimate && walletBalance < traceEstimate.totalCost)
+                                ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                                : 'bg-emerald-600 hover:bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'
+                            }`}
+                        >
+                            {isProcessing ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
+                            {isProcessing ? 'Processing...' : 'Execute & Download'}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+        </div>
+    );
+};

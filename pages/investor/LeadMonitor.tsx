@@ -16,10 +16,14 @@ import {
   X,
   Users,
   Snowflake,
-  Clock
+  Clock,
+  Download,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Link } from 'react-router-dom';
+import { Toast } from '../../components/ui/Toast';
 
 type TrackedProperty = Property & { _tracking?: ClientRecordTracking };
 type FilterType = 'ALL' | 'ACTIVE' | 'COOLDOWN' | 'REMOVED';
@@ -55,6 +59,10 @@ export const LeadMonitor = () => {
   const [laneFilter, setLaneFilter] = useState<Lane | null>(null);
   const [statusFilter, setStatusFilter] = useState<FilterType>('ACTIVE');
   const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  // Selection State
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -118,6 +126,73 @@ export const LeadMonitor = () => {
     setStatusFilter('ACTIVE');
   };
 
+  // Selection Logic
+  const toggleSelection = (e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+        newSelected.delete(id);
+    } else {
+        newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const isAllSelected = filteredProperties.length > 0 && filteredProperties.every(p => selectedIds.has(p.id));
+
+  const toggleSelectAll = () => {
+    const newSelected = new Set(selectedIds);
+    if (isAllSelected) {
+        // Deselect all visible
+        filteredProperties.forEach(p => newSelected.delete(p.id));
+    } else {
+        // Select all visible
+        filteredProperties.forEach(p => newSelected.add(p.id));
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const downloadCSV = (content: string, filename: string) => {
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+  };
+
+  const handleDownloadSelected = () => {
+    const selectedRecords = properties.filter(p => selectedIds.has(p.id));
+    if (selectedRecords.length === 0) return;
+
+    const headers = ['Address', 'City', 'State', 'Zip', 'Status', 'Lane', 'Score', 'Signals'];
+    const rows = selectedRecords.map(p => {
+        const t = p._tracking!;
+        return [
+            `"${p.addressLine1}"`,
+            `"${p.addressCity}"`,
+            `"${p.addressState}"`,
+            `"${p.addressPostalCode}"`,
+            t.status,
+            t.lane,
+            t.finalAllocationPoints,
+            `"${p.tags.join(' | ')}"`
+        ].join(',');
+    });
+
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    downloadCSV(csvContent, `FirstPulse_Reference_Export_${new Date().toISOString().split('T')[0]}.csv`);
+    
+    setToastMessage("Reference export downloaded - no touches counted");
+    // Optional: Clear selection after download
+    setSelectedIds(new Set());
+  };
+
   const getLaneColor = (lane?: Lane, status?: TrackingStatus) => {
     if (status === TrackingStatus.CoolingDown) return 'bg-cyan-500';
     if (status === TrackingStatus.ContactConstrained) return 'bg-gray-700';
@@ -163,6 +238,8 @@ export const LeadMonitor = () => {
 
   return (
     <div className="space-y-8 pb-12">
+      {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
@@ -206,11 +283,34 @@ export const LeadMonitor = () => {
           </div>
         </div>
         
-        {(laneFilter || statusFilter !== 'ACTIVE') && (
-            <button onClick={clearFilters} className="text-xs font-bold text-gray-500 hover:text-white flex items-center gap-1 uppercase tracking-wider transition-colors">
-                <X size={14} /> Clear Active Segment
-            </button>
-        )}
+        <div className="flex items-center gap-4">
+            {(laneFilter || statusFilter !== 'ACTIVE') && (
+                <button onClick={clearFilters} className="text-xs font-bold text-gray-500 hover:text-white flex items-center gap-1 uppercase tracking-wider transition-colors">
+                    <X size={14} /> Clear Active Segment
+                </button>
+            )}
+        </div>
+      </div>
+
+      {/* Bulk Actions Bar */}
+      <div className="flex items-center justify-between py-2 mb-2 bg-[#0A0A0A] border-b border-white/5 sticky top-0 z-20">
+         <button 
+             onClick={toggleSelectAll}
+             className="flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-white uppercase tracking-wider px-2 py-1"
+         >
+             {isAllSelected ? <CheckSquare size={16} className="text-emerald-500" /> : <Square size={16} />}
+             Select All ({filteredProperties.length})
+         </button>
+
+         {selectedIds.size > 0 && (
+             <button 
+                 onClick={handleDownloadSelected}
+                 className="flex items-center gap-2 text-xs font-bold text-black bg-emerald-500 hover:bg-emerald-400 px-4 py-1.5 rounded uppercase tracking-wider transition-colors shadow-lg shadow-emerald-900/20"
+             >
+                 <Download size={14} />
+                 Download Selection ({selectedIds.size})
+             </button>
+         )}
       </div>
 
       {/* Data Grid */}
@@ -228,14 +328,23 @@ export const LeadMonitor = () => {
             const daysRemaining = isCoolingDown ? getDaysRemaining(tracking.cooldownEndAt) : 0;
             const skipStatus = getSkipStatus(tracking);
             const hasPhone = skipStatus !== 'NOT TRACED';
+            const isSelected = selectedIds.has(prop.id);
             
             return (
-                <div key={prop.id} className={`bg-[#111111] border ${isCoolingDown ? 'border-cyan-900/40 bg-cyan-950/5' : 'border-white/5'} rounded-lg overflow-hidden transition-all hover:border-white/10`}>
+                <div key={prop.id} className={`bg-[#111111] border ${isSelected ? 'border-emerald-500/50' : isCoolingDown ? 'border-cyan-900/40 bg-cyan-950/5' : 'border-white/5'} rounded-lg overflow-hidden transition-all hover:border-white/10`}>
                     {/* Main Row */}
                     <div 
                         onClick={() => toggleExpand(prop.id)}
-                        className="p-4 flex flex-col md:flex-row md:items-center gap-4 cursor-pointer group"
+                        className="p-4 flex flex-col md:flex-row md:items-center gap-4 cursor-pointer group relative"
                     >
+                        {/* Selection Checkbox */}
+                        <div 
+                            onClick={(e) => toggleSelection(e, prop.id)}
+                            className={`flex items-center justify-center cursor-pointer transition-colors z-10 ${isSelected ? 'text-emerald-500' : 'text-gray-700 group-hover:text-gray-400'}`}
+                        >
+                            {isSelected ? <CheckSquare size={20} /> : <Square size={20} />}
+                        </div>
+
                         {/* Lane Indicator */}
                         <div className="w-32 flex items-center gap-2">
                             <div className={`w-2 h-2 rounded-full ${getLaneColor(tracking.lane, tracking.status)}`} />

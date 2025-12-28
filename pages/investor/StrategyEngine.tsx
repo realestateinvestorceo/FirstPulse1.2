@@ -113,6 +113,14 @@ export const StrategyEngine = () => {
         </div>
       </div>
 
+      {/* Info Banner */}
+      <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center gap-3">
+        <AlertTriangle className="text-amber-500 flex-shrink-0" size={20} />
+        <p className="text-sm text-amber-200">
+          Strategy configuration is managed by your partner. To adjust buy box criteria or cadence settings, contact <span className="font-bold text-white">Growth Marketing LLC</span>.
+        </p>
+      </div>
+
       {/* Tabs */}
       <div className="flex gap-8 border-b border-white/10">
         <button 

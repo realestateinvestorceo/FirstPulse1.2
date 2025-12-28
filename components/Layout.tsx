@@ -89,7 +89,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           { to: '/investor/strategy-engine', icon: GitBranch, label: 'Strategy Engine' },
           { to: '/investor/suppression', icon: ShieldAlert, label: 'Suppression' },
           { to: '/investor/execution-history', icon: Clock, label: 'Execution History' },
-          { to: '/investor/account', icon: Wallet, label: 'Skip Trace Wallet' },
+          { to: '/investor/account', icon: Wallet, label: 'Wallet' },
         ];
       default:
         return [];

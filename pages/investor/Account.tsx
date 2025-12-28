@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card } from '../../components/ui/Card';
 import { 
@@ -9,15 +8,23 @@ import {
   RefreshCw, 
   ArrowUpRight,
   ShieldCheck,
-  History
+  History,
+  DollarSign
 } from 'lucide-react';
 import { api } from '../../services/mockBackend';
 import { Client, Transaction } from '../../types';
+import { Modal } from '../../components/ui/Modal';
+import { Toast } from '../../components/ui/Toast';
 
 export const AccountPage = () => {
   const [client, setClient] = useState<Client | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Interaction State
+  const [isTopUpOpen, setIsTopUpOpen] = useState(false);
+  const [topUpAmount, setTopUpAmount] = useState<string>('100');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -26,20 +33,57 @@ export const AccountPage = () => {
         api.getTransactions(201)
       ]);
       if (clientData) setClient(clientData);
-      setTransactions(txData);
+      setTransactions(txData.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
       setLoading(false);
     };
     fetchData();
   }, []);
 
+  const handleTopUp = () => {
+    const amount = parseFloat(topUpAmount);
+    if (!client || isNaN(amount) || amount <= 0) return;
+
+    // Update Client State locally
+    setClient({
+        ...client,
+        skipTraceWalletBalance: client.skipTraceWalletBalance + amount
+    });
+
+    // Add Transaction
+    const newTx: Transaction = {
+        id: Date.now(),
+        clientId: client.id,
+        protocolEvent: 'MANUAL WALLET FUNDING',
+        settlementAmount: amount,
+        timestamp: new Date().toISOString()
+    };
+    setTransactions(prev => [newTx, ...prev]);
+    
+    // Feedback
+    setToastMessage(`Successfully added $${amount.toFixed(2)} to wallet.`);
+    setIsTopUpOpen(false);
+  };
+
+  const toggleAutoRecharge = () => {
+      if (!client) return;
+      const newState = !client.skipTraceAutoRecharge;
+      setClient({
+          ...client,
+          skipTraceAutoRecharge: newState
+      });
+      setToastMessage(newState ? 'Auto-recharge protocol activated.' : 'Auto-recharge protocol disabled.');
+  };
+
   if (loading || !client) return <div className="text-emerald-500 animate-pulse font-mono p-12 text-center">Loading Account Data...</div>;
 
   return (
     <div className="space-y-8 pb-12">
+      {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/5 pb-6">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Skip Trace Wallet</h1>
+          <h1 className="text-3xl font-bold text-white tracking-tight">Wallet</h1>
           <p className="text-gray-500 mt-1 text-sm font-mono uppercase tracking-wide">Manage settlement methods and audit transaction logs.</p>
         </div>
       </div>
@@ -62,7 +106,10 @@ export const AccountPage = () => {
               <p className="text-xs text-gray-500 uppercase tracking-wider">Supports optional skip trace enrichment services.</p>
             </div>
             
-            <button className="bg-emerald-600 hover:bg-emerald-500 text-black font-bold py-3 px-6 rounded-lg uppercase tracking-wider text-sm flex items-center gap-2 transition-colors shadow-lg shadow-emerald-900/20">
+            <button 
+                onClick={() => setIsTopUpOpen(true)}
+                className="bg-emerald-600 hover:bg-emerald-500 text-black font-bold py-3 px-6 rounded-lg uppercase tracking-wider text-sm flex items-center gap-2 transition-colors shadow-lg shadow-emerald-900/20"
+            >
               <ArrowUpRight size={18} />
               Top Up Balance
             </button>
@@ -80,8 +127,11 @@ export const AccountPage = () => {
                  </div>
                </div>
             </div>
-            {/* Mock Toggle */}
-            <div className={`w-12 h-6 rounded-full p-1 flex items-center cursor-pointer transition-colors ${client.skipTraceAutoRecharge ? 'bg-emerald-500' : 'bg-gray-700'}`}>
+            {/* Toggle */}
+            <div 
+                onClick={toggleAutoRecharge}
+                className={`w-12 h-6 rounded-full p-1 flex items-center cursor-pointer transition-colors ${client.skipTraceAutoRecharge ? 'bg-emerald-500' : 'bg-gray-700'}`}
+            >
               <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${client.skipTraceAutoRecharge ? 'translate-x-6' : 'translate-x-0'}`} />
             </div>
           </div>
@@ -186,6 +236,42 @@ export const AccountPage = () => {
           </table>
         </Card>
       </div>
+
+      <Modal 
+          isOpen={isTopUpOpen} 
+          onClose={() => setIsTopUpOpen(false)} 
+          title="Add Funds to Wallet"
+          icon={<DollarSign className="text-emerald-500" />}
+      >
+          <div className="space-y-6">
+              <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">Amount (USD)</label>
+                  <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-mono text-lg">$</span>
+                      <input 
+                        type="number" 
+                        value={topUpAmount}
+                        onChange={(e) => setTopUpAmount(e.target.value)}
+                        className="w-full bg-black border border-white/10 rounded-xl pl-8 pr-4 py-4 text-xl font-mono text-white focus:outline-none focus:border-emerald-500 transition-colors"
+                        autoFocus
+                      />
+                  </div>
+              </div>
+              <div className="bg-white/5 p-4 rounded-lg flex gap-3 items-center">
+                  <CreditCard className="text-gray-400" size={20} />
+                  <div>
+                      <div className="text-white text-sm font-bold">Using Primary Method</div>
+                      <div className="text-xs text-gray-500 font-mono">VISA •••• 4242</div>
+                  </div>
+              </div>
+              <button 
+                  onClick={handleTopUp}
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-black font-bold rounded-lg uppercase tracking-wider text-sm transition-colors"
+              >
+                  Confirm Transaction
+              </button>
+          </div>
+      </Modal>
     </div>
   );
 };
