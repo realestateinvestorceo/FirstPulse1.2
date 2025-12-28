@@ -325,7 +325,7 @@ export const initializeDatabase = () => {
 
   // 12. Transactions
   transactions = [
-    { id: 1, clientId: 201, protocolEvent: "INITIAL WALLET LOADING", settlementAmount: 500.00, timestamp: "2025-12-26T02:38:00" }
+    { id: 1, clientId: 201, protocolEvent: "INITIAL WALLET LOADING", settlementAmount: 500.00, timestamp: "2025-12-20T02:38:00" }
   ];
 
   // 13. Weekly Batches (Seed one historical)
@@ -333,9 +333,9 @@ export const initializeDatabase = () => {
     {
       id: 1,
       clientId: 201,
-      batchId: '201-2025-40',
-      weekStart: '2025-09-28',
-      weekEnd: '2025-10-04',
+      batchId: '201-2025-51',
+      weekStart: '2025-12-15',
+      weekEnd: '2025-12-21',
       totalRecords: 1200,
       freshCount: 300,
       repeatCount: 850,
@@ -347,11 +347,11 @@ export const initializeDatabase = () => {
       skipTraceCost: 18.00,
       duplicateContactsAvoided: 45,
       status: BatchStatus.Downloaded,
-      generatedAt: '2025-10-02T01:00:00',
-      firstDownloadAt: '2025-10-02T01:00:00',
+      generatedAt: '2025-12-16T08:00:00',
+      firstDownloadAt: '2025-12-16T08:00:00',
       downloadCount: 1,
-      createdAt: '2025-10-02T01:00:00',
-      updatedAt: '2025-10-02T01:00:00'
+      createdAt: '2025-12-16T08:00:00',
+      updatedAt: '2025-12-16T08:00:00'
     }
   ];
 };

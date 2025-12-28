@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Lock, GitBranch, AlertTriangle, Calendar, Activity, CheckCircle2, Shield, MapPin } from 'lucide-react';
@@ -322,11 +323,7 @@ export const StrategyEngine = () => {
                 </Card>
             </div>
             
-            <div className="flex justify-end pt-4">
-                <button disabled className="px-6 py-3 bg-white/5 text-gray-500 font-bold rounded-lg uppercase tracking-wider text-sm cursor-not-allowed border border-white/5 hover:border-white/10 transition-colors">
-                    Save Profile Configuration
-                </button>
-            </div>
+            <p className="text-xs text-gray-500 italic text-right mt-4">Contact your Partner to modify Buy Box criteria</p>
         </div>
       )}
     </div>

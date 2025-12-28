@@ -22,6 +22,7 @@ import { Card } from '../../components/ui/Card';
 import { Link } from 'react-router-dom';
 
 type TrackedProperty = Property & { _tracking?: ClientRecordTracking };
+type FilterType = 'ALL' | 'ACTIVE' | 'COOLDOWN' | 'REMOVED';
 
 const StatCard = ({ label, value, color = 'text-white' }: { label: string; value: number; color?: string }) => (
   <Card className="bg-[#111111] border-white/5">
@@ -52,7 +53,7 @@ export const LeadMonitor = () => {
   
   // Filters
   const [laneFilter, setLaneFilter] = useState<Lane | null>(null);
-  const [statusFilter, setStatusFilter] = useState<TrackingStatus | 'ALL'>('ACTIVE');
+  const [statusFilter, setStatusFilter] = useState<FilterType>('ACTIVE');
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -144,7 +145,7 @@ export const LeadMonitor = () => {
 
   // Skip Trace Status Helper
   const getSkipStatus = (tracking: ClientRecordTracking) => {
-      if (!tracking.skipTracedAt) return '--';
+      if (!tracking.skipTracedAt) return 'NOT TRACED';
       const date = new Date(tracking.skipTracedAt);
       return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }).toUpperCase();
   };
@@ -226,7 +227,7 @@ export const LeadMonitor = () => {
             const isCoolingDown = tracking.status === TrackingStatus.CoolingDown;
             const daysRemaining = isCoolingDown ? getDaysRemaining(tracking.cooldownEndAt) : 0;
             const skipStatus = getSkipStatus(tracking);
-            const hasPhone = skipStatus !== '--';
+            const hasPhone = skipStatus !== 'NOT TRACED';
             
             return (
                 <div key={prop.id} className={`bg-[#111111] border ${isCoolingDown ? 'border-cyan-900/40 bg-cyan-950/5' : 'border-white/5'} rounded-lg overflow-hidden transition-all hover:border-white/10`}>
@@ -285,7 +286,7 @@ export const LeadMonitor = () => {
                         {/* Skip Status */}
                         {!isCoolingDown && (
                             <div className="w-24 text-right md:text-left">
-                                <div className="text-[10px] text-gray-600 uppercase font-bold">Skip Status</div>
+                                <div className="text-[10px] text-gray-600 uppercase font-bold">Last Traced</div>
                                 <div className={`text-xs font-mono ${hasPhone ? 'text-emerald-500' : 'text-gray-600'}`}>{skipStatus}</div>
                             </div>
                         )}

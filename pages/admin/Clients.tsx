@@ -120,7 +120,11 @@ export const Clients = () => {
                     <td className="px-6 py-4">
                       <div className="font-medium text-white flex items-center gap-2">
                         {client.name}
-                        {client.firstBatchGeneratedAt && <CheckCircle2 size={12} className="text-emerald-500" title="First Batch Generated" />}
+                        {client.firstBatchGeneratedAt && (
+                          <span title="First Batch Generated" className="flex items-center">
+                            <CheckCircle2 size={12} className="text-emerald-500" />
+                          </span>
+                        )}
                       </div>
                       <div className="text-xs">{client.companyName}</div>
                       <div className="text-xs text-gray-500">{client.email}</div>

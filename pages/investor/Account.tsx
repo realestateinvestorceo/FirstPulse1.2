@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card } from '../../components/ui/Card';
 import { 
@@ -53,7 +54,7 @@ export const AccountPage = () => {
             <div>
               <div className="flex items-center gap-2 text-emerald-500 mb-2">
                 <Wallet size={20} />
-                <span className="text-xs font-bold uppercase tracking-widest">Skip Trace Settlement Balance</span>
+                <span className="text-xs font-bold uppercase tracking-widest">WALLET BALANCE</span>
               </div>
               <div className="text-5xl font-mono font-bold text-white tracking-tight mb-2">
                 ${client.skipTraceWalletBalance.toFixed(2)}

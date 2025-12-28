@@ -1,4 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Modal } from '../../components/ui/Modal';
 import { api } from '../../services/mockBackend';
@@ -13,7 +15,9 @@ import {
   Loader2,
   FileDown,
   Users,
-  Search
+  Search,
+  Map,
+  TrendingUp
 } from 'lucide-react';
 
 const Counter = ({ label, value, brightness = 'text-white' }: { label: string; value: string; brightness?: string }) => (
@@ -46,6 +50,22 @@ const Toast = ({ message, onClose }: { message: string, onClose: () => void }) =
      <button onClick={onClose} className="text-gray-500 hover:text-white ml-2"><span className="sr-only">Close</span>×</button>
   </div>
 );
+
+// Mock Data for New Sections
+const VELOCITY_DATA = [
+    { zip: '60614', status: 'HOT', bg: 'bg-amber-500/10', text: 'text-amber-500', border: 'border-amber-500/20' },
+    { zip: '60657', status: 'HOT', bg: 'bg-amber-500/10', text: 'text-amber-500', border: 'border-amber-500/20' },
+    { zip: '60618', status: 'WARM', bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20' },
+    { zip: '77007', status: 'WARM', bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20' },
+    { zip: '77019', status: 'HOT', bg: 'bg-amber-500/10', text: 'text-amber-500', border: 'border-amber-500/20' },
+];
+
+const SOLD_PULSE_DATA = [
+    { address: '1234 Oak St', price: 425000, time: '2 days ago' },
+    { address: '5678 Maple Ave', price: 315000, time: '4 days ago' },
+    { address: '9012 Pine Ln', price: 550000, time: '1 week ago' },
+    { address: '3456 Cedar Dr', price: 289000, time: '1 week ago' },
+];
 
 export const InvestorDashboard = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -225,34 +245,36 @@ export const InvestorDashboard = () => {
                 </Card>
 
                 {/* Right Card: Hot Sheet */}
-                <Card className="lg:col-span-2 bg-[#111111] border-amber-500/20 relative overflow-hidden h-full">
-                    <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-transparent to-transparent pointer-events-none" />
-                    
-                    <div className="p-8 h-full flex flex-col justify-between">
-                        <div>
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="text-xs font-bold text-amber-500 tracking-widest uppercase">72-Hour Priority</div>
-                                <Flame className="text-amber-500 fill-amber-500/20" size={24} />
-                            </div>
-                            <h2 className="text-2xl text-white flex items-center gap-2 font-semibold">
-                                HOT SHEET 
-                                <ArrowRight size={20} className="text-amber-500/50" />
-                            </h2>
-                            <p className="text-sm text-gray-400 mt-4 leading-relaxed border-l-2 border-amber-500/20 pl-4">
-                                Urgent high-probability distress signals requiring rapid follow-up action.
-                            </p>
-                        </div>
+                <Link to="/investor/lead-monitor?filter=blitz&status=active" className="lg:col-span-2 block h-full group cursor-pointer">
+                    <Card className="bg-[#111111] border-amber-500/20 relative overflow-hidden h-full group-hover:border-amber-500/40 transition-colors">
+                        <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-transparent to-transparent pointer-events-none" />
                         
-                        <div className="mt-8">
-                            <div className="text-7xl font-mono font-bold text-white mb-2 tracking-tighter">
-                                {latestBatch ? latestBatch.blitzCount + latestBatch.freshCount : '--'}
+                        <div className="p-8 h-full flex flex-col justify-between">
+                            <div>
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className="text-xs font-bold text-amber-500 tracking-widest uppercase">72-Hour Priority</div>
+                                    <Flame className="text-amber-500 fill-amber-500/20" size={24} />
+                                </div>
+                                <h2 className="text-2xl text-white flex items-center gap-2 font-semibold">
+                                    HOT SHEET 
+                                    <ArrowRight size={20} className="text-amber-500/50 group-hover:text-amber-500 group-hover:translate-x-1 transition-all" />
+                                </h2>
+                                <p className="text-sm text-gray-400 mt-4 leading-relaxed border-l-2 border-amber-500/20 pl-4">
+                                    Urgent high-probability distress signals requiring rapid follow-up action.
+                                </p>
                             </div>
-                            <div className="inline-block px-3 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-500 tracking-widest uppercase">
-                                Hot Subset
+                            
+                            <div className="mt-8">
+                                <div className="text-7xl font-mono font-bold text-white mb-2 tracking-tighter">
+                                    {latestBatch ? latestBatch.blitzCount + latestBatch.freshCount : '--'}
+                                </div>
+                                <div className="inline-block px-3 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-500 tracking-widest uppercase">
+                                    Hot Subset
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </Card>
+                    </Card>
+                </Link>
             </div>
 
             {/* Row 2: Lane Breakdown */}
@@ -275,115 +297,15 @@ export const InvestorDashboard = () => {
                  </div>
             </div>
 
-            {/* Confirmation Modal */}
-            <Modal 
-                isOpen={isModalOpen} 
-                onClose={() => setIsModalOpen(false)}
-                title="CONFIRM MARKETING EXECUTION"
-                icon={<AlertTriangle className="text-amber-500" />}
-            >
-                <div className="space-y-6">
-                    <p className="text-gray-300 leading-relaxed text-sm">
-                        You are about to download this week's marketing batch. This action will increment touch counts and record this execution in your history.
-                    </p>
-                    
-                    {/* Skip Trace Section */}
-                    <div className="p-4 bg-white/5 border border-white/10 rounded-lg">
-                        <div className="flex items-start gap-3">
-                            <div className={`mt-1 p-1.5 rounded-full border transition-colors ${includeSkipTrace ? 'bg-emerald-500 border-emerald-500 text-black' : 'border-gray-600 text-transparent'}`}>
-                                <Search size={14} />
-                            </div>
-                            <div className="flex-1">
-                                <div className="flex items-center justify-between">
-                                    <label htmlFor="skip-trace-toggle" className="font-bold text-white text-sm cursor-pointer select-none">
-                                        Include Skip Trace Enrichment
-                                    </label>
-                                    <div 
-                                        onClick={() => setIncludeSkipTrace(!includeSkipTrace)}
-                                        className={`w-10 h-5 rounded-full p-0.5 cursor-pointer transition-colors ${includeSkipTrace ? 'bg-emerald-500' : 'bg-gray-700'}`}
-                                    >
-                                        <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${includeSkipTrace ? 'translate-x-5' : 'translate-x-0'}`} />
-                                    </div>
-                                </div>
-                                <p className="text-xs text-gray-500 mt-1">
-                                    Automatically append mobile & landline numbers to untraced records.
-                                </p>
-
-                                {includeSkipTrace && traceEstimate && (
-                                    <div className="mt-4 pt-4 border-t border-white/10 space-y-2 text-xs">
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-400">Records to Trace</span>
-                                            <span className="text-white font-mono">{traceEstimate.eligibleCount}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-400">Already Traced (&lt; 6mo)</span>
-                                            <span className="text-emerald-500 font-mono">{traceEstimate.alreadyTracedCount}</span>
-                                        </div>
-                                        <div className="flex justify-between pt-2 border-t border-dashed border-white/10">
-                                            <span className="text-gray-300 font-bold">Estimated Cost</span>
-                                            <span className="text-white font-mono font-bold">${traceEstimate.totalCost.toFixed(2)}</span>
-                                        </div>
-                                        
-                                        <div className="mt-3 p-2 bg-black/40 rounded flex justify-between items-center">
-                                            <span className="text-gray-500">Balance After</span>
-                                            <span className={`font-mono font-bold ${walletBalance - traceEstimate.totalCost < 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                                                ${(walletBalance - traceEstimate.totalCost).toFixed(2)}
-                                            </span>
-                                        </div>
-                                        {walletBalance < traceEstimate.totalCost && (
-                                            <div className="text-red-500 font-bold text-[10px] mt-1 text-right">
-                                                INSUFFICIENT FUNDS
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Deduplication warning if applicable */}
-                    <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg flex gap-3 items-start">
-                         <Users size={16} className="text-blue-500 mt-0.5 flex-shrink-0" />
-                         <p className="text-xs text-blue-200">
-                             Deduplication Protocol Active: Owners with multiple properties will only receive marketing for their highest-priority asset.
-                         </p>
-                    </div>
-
-                    <div className="bg-white/5 p-4 rounded-lg border border-white/5 flex gap-3">
-                        <input 
-                            type="checkbox" 
-                            id="confirm-check" 
-                            checked={isConfirmed} 
-                            onChange={(e) => setIsConfirmed(e.target.checked)}
-                            className="mt-1 w-4 h-4 rounded border-gray-600 bg-black/40 text-emerald-500 focus:ring-emerald-500"
-                        />
-                        <label htmlFor="confirm-check" className="text-sm text-gray-300 font-medium cursor-pointer">
-                            I confirm I am marketing to these contacts.
-                        </label>
-                    </div>
-
-                    <div className="flex gap-3 pt-2">
-                        <button 
-                            onClick={() => setIsModalOpen(false)}
-                            className="flex-1 py-3 rounded-lg bg-white/5 border border-white/10 text-gray-400 font-bold text-sm hover:bg-white/10 hover:text-white transition-colors uppercase tracking-wider"
-                        >
-                            Cancel
-                        </button>
-                        <button 
-                            onClick={executeBatch}
-                            disabled={!isConfirmed || isProcessing || (includeSkipTrace && traceEstimate && walletBalance < traceEstimate.totalCost) as boolean}
-                            className={`flex-1 py-3 rounded-lg font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${
-                                !isConfirmed || isProcessing || (includeSkipTrace && traceEstimate && walletBalance < traceEstimate.totalCost)
-                                ? 'bg-emerald-500/20 text-emerald-500/50 cursor-not-allowed'
-                                : 'bg-emerald-600 hover:bg-emerald-500 text-black shadow-lg shadow-emerald-900/20'
-                            }`}
-                        >
-                            {isProcessing ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={18} />}
-                            Confirm & Download
-                        </button>
-                    </div>
-                </div>
-            </Modal>
-        </div>
-    );
-};
+            {/* Row 3: Regional Velocity & Sold Pulse */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Regional Velocity */}
+                <div className="lg:col-span-2">
+                     <div className="flex items-center gap-2 mb-4 ml-1">
+                          <Map size={16} className="text-gray-500" />
+                          <h3 className="text-xs font-bold text-gray-500 tracking-widest uppercase">Regional Velocity</h3>
+                     </div>
+                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                          {VELOCITY_DATA.map(item => (
+                              <Card key={item.zip} className={`bg-[#111111] border ${item.border} p-3 flex flex-col items-center justify-center text-center hover:bg-white/5 transition-colors`}>
+                                  <div className="text-lg font-mono font
