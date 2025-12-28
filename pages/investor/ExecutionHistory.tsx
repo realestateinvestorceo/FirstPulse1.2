@@ -3,7 +3,7 @@ import { Card } from '../../components/ui/Card';
 import { 
   Clock, 
   Download, 
-  RotateCcw,
+  RotateCcw, 
   Archive,
   Info
 } from 'lucide-react';
@@ -132,13 +132,19 @@ export const ExecutionHistory = () => {
 
                      {/* Skip Settlement */}
                      <td className="px-6 py-4 text-right">
-                        <div className="text-lg font-mono font-bold text-white">
-                           ${batch.skipTraceCost.toFixed(2)}
-                        </div>
-                        <div className="text-[10px] text-emerald-500 font-bold uppercase tracking-wider">
-                           {batch.skipTraceCount} Skip Traces
-                        </div>
-                     </td>
+                        {batch.skipTraceCount > 0 ? (
+                            <div>
+                            <div className="text-lg font-mono font-bold text-white">
+                                ${batch.skipTraceCost.toFixed(2)}
+                            </div>
+                            <div className="text-[10px] text-gray-400 font-mono">
+                                {batch.skipTraceCount} traced @ ${(batch.skipTraceCost / batch.skipTraceCount).toFixed(2)}/ea
+                            </div>
+                            </div>
+                        ) : (
+                            <div className="text-sm text-gray-600 font-mono">—</div>
+                        )}
+                    </td>
 
                      {/* Actions */}
                      <td className="px-6 py-4 text-right">

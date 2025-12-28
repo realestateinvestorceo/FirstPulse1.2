@@ -1,8 +1,10 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card, CardHeader } from '../../components/ui/Card';
+import { Modal } from '../../components/ui/Modal';
 import { api } from '../../services/mockBackend';
-import { Client, ClientStatus } from '../../types';
-import { Search, Plus } from 'lucide-react';
+import { Client, ClientStatus, SubscriptionTier } from '../../types';
+import { Search, Plus, Users, Mail, Building } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const StatusBadge = ({ status }: { status: ClientStatus }) => {
@@ -23,17 +25,44 @@ const StatusBadge = ({ status }: { status: ClientStatus }) => {
 export const PartnerClients = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const navigate = useNavigate();
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [newClient, setNewClient] = useState({ name: '', email: '', companyName: '' });
 
   useEffect(() => {
     // Hardcoded Partner ID 101 for the demo partner context
     api.getClients(101).then(setClients);
   }, []);
 
+  const handleAddClient = () => {
+    if (!newClient.name || !newClient.email) return;
+
+    const client: Client = {
+        id: Date.now(),
+        partnerId: 101,
+        ...newClient,
+        clientStatus: ClientStatus.Onboarding,
+        subscriptionTier: SubscriptionTier.FRESH_ONLY,
+        weeklyCapacity: 100,
+        skipTraceWalletBalance: 0,
+        skipTraceAutoRecharge: false,
+        skipTraceRechargeThreshold: 25,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+    };
+    
+    setClients([...clients, client]);
+    setIsAddOpen(false);
+    setNewClient({ name: '', email: '', companyName: '' });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-white">My Clients</h1>
-        <button className="bg-emerald-600 hover:bg-emerald-500 text-black font-semibold px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
+        <button 
+            onClick={() => setIsAddOpen(true)}
+            className="bg-emerald-600 hover:bg-emerald-500 text-black font-semibold px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+        >
           <Plus size={18} />
           Add Client
         </button>
@@ -96,6 +125,53 @@ export const PartnerClients = () => {
           </table>
         </div>
       </Card>
+
+      <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="Add New Client" icon={<Users className="text-emerald-500" />}>
+        <div className="space-y-4">
+            <div>
+                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Client Name</label>
+                <div className="relative">
+                    <Users className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                    <input 
+                        placeholder="e.g. John Doe" 
+                        value={newClient.name} 
+                        onChange={e => setNewClient({...newClient, name: e.target.value})} 
+                        className="w-full bg-black border border-white/10 rounded-lg pl-10 pr-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors" 
+                    />
+                </div>
+            </div>
+            <div>
+                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Email Address</label>
+                <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                    <input 
+                        placeholder="client@company.com" 
+                        value={newClient.email} 
+                        onChange={e => setNewClient({...newClient, email: e.target.value})} 
+                        className="w-full bg-black border border-white/10 rounded-lg pl-10 pr-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors" 
+                    />
+                </div>
+            </div>
+            <div>
+                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Company Name</label>
+                <div className="relative">
+                    <Building className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                    <input 
+                        placeholder="e.g. Windy City Properties" 
+                        value={newClient.companyName} 
+                        onChange={e => setNewClient({...newClient, companyName: e.target.value})} 
+                        className="w-full bg-black border border-white/10 rounded-lg pl-10 pr-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors" 
+                    />
+                </div>
+            </div>
+            <button 
+                onClick={handleAddClient} 
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-black font-bold rounded-lg mt-2 transition-colors"
+            >
+            Create Client
+            </button>
+        </div>
+      </Modal>
     </div>
   );
 };

@@ -1,24 +1,57 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card, CardHeader } from '../../components/ui/Card';
+import { Modal } from '../../components/ui/Modal';
+import { Toast } from '../../components/ui/Toast';
 import { api } from '../../services/mockBackend';
 import { County } from '../../types';
-import { Plus, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Plus, RefreshCw, CheckCircle2, AlertCircle, Map } from 'lucide-react';
 
 export const Counties = () => {
   const [counties, setCounties] = useState<County[]>([]);
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [newTerritory, setNewTerritory] = useState({ fips: '', name: '', state: '', stateCode: '', population: '' });
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
     api.getCounties().then(setCounties);
   }, []);
 
+  const handleAddTerritory = () => {
+    if (!newTerritory.fips || !newTerritory.name) return;
+
+    const county: County = {
+      fips: newTerritory.fips,
+      name: newTerritory.name,
+      state: newTerritory.state,
+      stateCode: newTerritory.stateCode || newTerritory.state.substring(0, 2).toUpperCase(),
+      population: parseInt(newTerritory.population) || 0,
+      status: 'Pending',
+      activeClients: 0,
+      lastDataPull: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    setCounties([...counties, county]);
+    setIsAddOpen(false);
+    setNewTerritory({ fips: '', name: '', state: '', stateCode: '', population: '' });
+    setToastMessage("Territory added successfully");
+  };
+
   return (
     <div className="space-y-6">
+      {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
+
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-white">Market Coverage</h1>
           <p className="text-gray-500 text-sm mt-1">Manage active data feeds and county availability.</p>
         </div>
-        <button className="bg-emerald-600 hover:bg-emerald-500 text-black font-semibold px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
+        <button 
+          onClick={() => setIsAddOpen(true)}
+          className="bg-emerald-600 hover:bg-emerald-500 text-black font-semibold px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+        >
           <Plus size={18} />
           Add Territory
         </button>
@@ -84,6 +117,66 @@ export const Counties = () => {
           </table>
         </div>
       </Card>
+
+      <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="Add New Territory" icon={<Map className="text-emerald-500" />}>
+        <div className="space-y-4">
+            <div>
+                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">FIPS Code</label>
+                <input 
+                    placeholder="e.g. 17031" 
+                    value={newTerritory.fips} 
+                    onChange={e => setNewTerritory({...newTerritory, fips: e.target.value})} 
+                    className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors font-mono" 
+                />
+            </div>
+            <div>
+                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">County Name</label>
+                <input 
+                    placeholder="e.g. Cook County" 
+                    value={newTerritory.name} 
+                    onChange={e => setNewTerritory({...newTerritory, name: e.target.value})} 
+                    className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors" 
+                />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">State</label>
+                    <input 
+                        placeholder="e.g. Illinois" 
+                        value={newTerritory.state} 
+                        onChange={e => setNewTerritory({...newTerritory, state: e.target.value})} 
+                        className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors" 
+                    />
+                </div>
+                <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">State Code</label>
+                    <input 
+                        placeholder="e.g. IL" 
+                        maxLength={2}
+                        value={newTerritory.stateCode} 
+                        onChange={e => setNewTerritory({...newTerritory, stateCode: e.target.value.toUpperCase()})} 
+                        className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors" 
+                    />
+                </div>
+            </div>
+            <div>
+                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Population</label>
+                <input 
+                    type="number"
+                    placeholder="e.g. 5200000" 
+                    value={newTerritory.population} 
+                    onChange={e => setNewTerritory({...newTerritory, population: e.target.value})} 
+                    className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors" 
+                />
+            </div>
+            <button 
+                onClick={handleAddTerritory} 
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-black font-bold rounded-lg mt-2 transition-colors"
+            >
+                Add Territory
+            </button>
+        </div>
+      </Modal>
     </div>
   );
 };

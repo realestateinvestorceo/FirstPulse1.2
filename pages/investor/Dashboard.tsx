@@ -369,17 +369,37 @@ export const InvestorDashboard = () => {
                          </div>
 
                          {includeSkipTrace && traceEstimate && (
-                             <div className="pt-4 border-t border-white/10 space-y-2">
+                             <div className="pt-4 border-t border-white/10 space-y-3">
                                  <div className="flex justify-between text-xs">
-                                     <span className="text-gray-400">Eligible for Trace</span>
+                                     <span className="text-gray-400">Records in batch</span>
+                                     <span className="text-white font-mono">{traceEstimate.eligibleCount + traceEstimate.alreadyTracedCount}</span>
+                                 </div>
+                                 <div className="flex justify-between text-xs">
+                                     <span className="text-gray-400">Already traced (skipped)</span>
+                                     <span className="text-gray-500 font-mono">-{traceEstimate.alreadyTracedCount}</span>
+                                 </div>
+                                 <div className="flex justify-between text-xs">
+                                     <span className="text-gray-400">Records to trace</span>
                                      <span className="text-white font-mono">{traceEstimate.eligibleCount}</span>
                                  </div>
                                  <div className="flex justify-between text-xs">
-                                     <span className="text-gray-400">Est. Cost ({traceEstimate.rate}/record)</span>
+                                     <span className="text-gray-400">Cost per trace</span>
+                                     <span className="text-white font-mono">${traceEstimate.rate.toFixed(2)}</span>
+                                 </div>
+                                 <div className="flex justify-between text-sm pt-2 border-t border-white/5">
+                                     <span className="text-white font-bold">Estimated Total</span>
                                      <span className="text-emerald-500 font-mono font-bold">${traceEstimate.totalCost.toFixed(2)}</span>
                                  </div>
+                                 <div className="flex justify-between text-xs pt-2">
+                                     <span className="text-gray-500">Current Balance</span>
+                                     <span className="text-white font-mono">${walletBalance.toFixed(2)}</span>
+                                 </div>
+                                 <div className="flex justify-between text-xs">
+                                     <span className="text-gray-500">Balance After</span>
+                                     <span className="text-emerald-500 font-mono">${(walletBalance - traceEstimate.totalCost).toFixed(2)}</span>
+                                 </div>
                                  {walletBalance < traceEstimate.totalCost && (
-                                     <div className="mt-2 text-xs text-red-500 flex items-center gap-1.5 bg-red-500/10 p-2 rounded">
+                                     <div className="mt-2 text-xs text-red-500 flex items-center gap-1.5 bg-red-500/10 p-2 rounded border border-red-500/20">
                                          <AlertTriangle size={12} />
                                          Insufficient Wallet Balance
                                      </div>
