@@ -320,7 +320,7 @@ export const initializeDatabase = () => {
   ];
 
   transactions = [
-    { id: 1, clientId: 201, protocolEvent: "INITIAL WALLET LOADING", settlementAmount: 500.00, timestamp: "2025-12-20T02:38:00" }
+    { id: 1, clientId: 201, protocolEvent: "INITIAL WALLET LOADING", settlementAmount: 425.50, timestamp: "2025-12-20T02:38:00" }
   ];
 
   weeklyBatches = [
@@ -330,15 +330,15 @@ export const initializeDatabase = () => {
       batchId: '201-2025-51',
       weekStart: '2025-12-15',
       weekEnd: '2025-12-21',
-      totalRecords: 1200,
-      freshCount: 300,
-      repeatCount: 850,
+      totalRecords: 10,
+      freshCount: 3,
+      repeatCount: 7,
       queueCount: 50,
-      blitzCount: 200,
-      chaseCount: 400,
-      nurtureCount: 600,
-      skipTraceCount: 300,
-      skipTraceCost: 18.00,
+      blitzCount: 2,
+      chaseCount: 4,
+      nurtureCount: 4,
+      skipTraceCount: 3,
+      skipTraceCost: 0.36,
       duplicateContactsAvoided: 45,
       status: BatchStatus.Downloaded,
       generatedAt: '2025-12-16T08:00:00',
@@ -463,6 +463,7 @@ export const api = {
   },
 
   generateWeeklyBatch: async (clientId: number) => {
+     console.log(`[GenerateBatch] Starting for clientId: ${clientId}`);
      await new Promise(resolve => setTimeout(resolve, 1500));
      const client = clients.find(c => c.id === clientId);
      if (!client) throw new Error("Client not found");
@@ -567,42 +568,64 @@ export const api = {
         duplicateContactsAvoided: candidates.length - finalSelection.length, status: BatchStatus.Generated, generatedAt: now.toISOString(), downloadCount: 0, createdAt: now.toISOString(), updatedAt: now.toISOString()
      };
      weeklyBatches.push(newBatch);
+     
+     // Persistence check: batch records are not strictly persisted in an IDs array in this mock but we identify the batch by status 'Generated'
      if (!client.firstBatchGeneratedAt) client.firstBatchGeneratedAt = now.toISOString();
+     console.log(`[GenerateBatch] Batch ${newBatch.batchId} created with ${newBatch.totalRecords} records.`);
      return newBatch;
   },
 
   getBatchSkipTraceEstimates: async (clientId: number) => {
+      console.log(`[Estimates] Calculating for clientId: ${clientId}`);
       const client = clients.find(c => c.id === clientId);
-      if (!client) return null;
+      if (!client) {
+          console.warn(`[Estimates] Client ${clientId} not found.`);
+          return { eligibleCount: 0, alreadyTracedCount: 0, rate: 0.06, totalCost: 0 };
+      }
 
-      // Find 'Generated' batch if it exists
-      const batch = weeklyBatches
-        .filter(b => b.clientId === clientId && b.status === BatchStatus.Generated)
-        .sort((a, b) => b.id - a.id)[0];
-      
       const partnerConfigs = await api.getPartnerConfig(client.partnerId || 0);
       const rateStr = partnerConfigs.find(c => c.settingKey === 'skip_trace_rate')?.settingValue;
       const rate = rateStr ? parseFloat(rateStr) : 0.06;
 
-      // Determine target records to estimate against. If a batch is generated, use its size.
-      // Otherwise, assume the client's current weekly capacity for the upcoming batch.
+      // Find the specific 'Generated' batch records.
+      // In the real system, batch_records links properties to a batch.
+      // In this mock, we re-run the selection logic to identify which records would be in the current generated batch.
+      const batch = weeklyBatches
+        .filter(b => b.clientId === clientId && b.status === BatchStatus.Generated)
+        .sort((a, b) => b.id - a.id)[0];
+      
       const targetCount = batch ? batch.totalRecords : client.weeklyCapacity;
+      console.log(`[Estimates] Target record count for estimation: ${targetCount} (Source: ${batch ? 'Batch' : 'Capacity Fallback'})`);
 
-      // Fetch active tracks that would be included in an execution
+      // Selection logic matching generateWeeklyBatch
       const activeTracks = clientRecordTrackings
         .filter(t => t.clientId === clientId && t.status === TrackingStatus.Active)
         .sort((a,b) => b.finalAllocationPoints - a.finalAllocationPoints)
         .slice(0, targetCount);
 
-      const sixMonthsAgo = new Date(Date.now() - 1000 * 60 * 60 * 24 * 180);
-      const eligibleCount = activeTracks.filter(t => !t.skipTracedAt || new Date(t.skipTracedAt) < sixMonthsAgo).length;
+      if (activeTracks.length === 0) {
+          console.warn(`[Estimates] No active tracks found for client ${clientId}. Pool empty.`);
+          return { 
+            eligibleCount: 0, 
+            alreadyTracedCount: 0, 
+            rate, 
+            totalCost: 0 
+          };
+      }
 
-      return { 
+      const sixMonthsAgo = new Date(Date.now() - 1000 * 60 * 60 * 24 * 180);
+      const eligibleRecords = activeTracks.filter(t => !t.skipTracedAt || new Date(t.skipTracedAt) < sixMonthsAgo);
+      const eligibleCount = eligibleRecords.length;
+      const alreadyTracedCount = activeTracks.length - eligibleCount;
+
+      const result = { 
         eligibleCount, 
-        alreadyTracedCount: activeTracks.length - eligibleCount, 
+        alreadyTracedCount: Math.max(0, alreadyTracedCount), 
         rate, 
-        totalCost: eligibleCount * rate 
+        totalCost: Number((eligibleCount * rate).toFixed(2))
       };
+      console.log(`[Estimates] Calculation Success:`, result);
+      return result;
   },
 
   getClients: async (partnerId?: number) => partnerId ? clients.filter(c => c.partnerId === partnerId) : clients,
@@ -620,38 +643,88 @@ export const api = {
   getWeeklyBatches: async (clientId: number) => weeklyBatches.filter(b => b.clientId === clientId).sort((a,b) => b.id - a.id),
 
   executeWeeklyBatch: async (clientId: number, options?: { skipTrace: boolean }) => {
+    console.log(`[ExecuteBatch] Executing for clientId: ${clientId}, Options:`, options);
     await new Promise(resolve => setTimeout(resolve, 1500));
-    let targetBatch = weeklyBatches.filter(b => b.clientId === clientId && b.status === BatchStatus.Generated).sort((a,b) => b.id - a.id)[0];
-    if (!targetBatch) targetBatch = await api.generateWeeklyBatch(clientId);
+    
     const client = clients.find(c => c.id === clientId);
     if (!client) throw new Error("Client not found");
 
+    let targetBatch = weeklyBatches.filter(b => b.clientId === clientId && b.status === BatchStatus.Generated).sort((a,b) => b.id - a.id)[0];
+    if (!targetBatch) {
+        console.log(`[ExecuteBatch] No existing Generated batch found. Triggering on-the-fly generation.`);
+        targetBatch = await api.generateWeeklyBatch(clientId);
+    }
+
     if (options?.skipTrace) {
         const estimate = await api.getBatchSkipTraceEstimates(clientId);
+        console.log(`[ExecuteBatch] Skip Trace requested. Estimate:`, estimate);
         if (estimate && estimate.eligibleCount > 0) {
-            if (client.skipTraceWalletBalance < estimate.totalCost) throw new Error("Insufficient wallet balance");
-            client.skipTraceWalletBalance -= estimate.totalCost;
-            transactions.push({ id: transactions.length + 1, clientId, protocolEvent: 'SKIP TRACE BATCH ENRICHMENT', settlementAmount: -estimate.totalCost, timestamp: new Date().toISOString() });
+            if (client.skipTraceWalletBalance < estimate.totalCost) {
+                console.error(`[ExecuteBatch] Insufficient funds: ${client.skipTraceWalletBalance} < ${estimate.totalCost}`);
+                throw new Error("Insufficient wallet balance for skip trace enrichment.");
+            }
+            
+            // Deduct from wallet
+            const previousBalance = client.skipTraceWalletBalance;
+            client.skipTraceWalletBalance = Number((client.skipTraceWalletBalance - estimate.totalCost).toFixed(2));
+            console.log(`[ExecuteBatch] Wallet Updated: ${previousBalance} -> ${client.skipTraceWalletBalance}`);
+
+            // Log Transaction
+            const newTx: Transaction = { 
+                id: transactions.length + 1, 
+                clientId, 
+                protocolEvent: 'SKIP TRACE BATCH ENRICHMENT', 
+                settlementAmount: -estimate.totalCost, 
+                timestamp: new Date().toISOString() 
+            };
+            transactions.push(newTx);
+            console.log(`[ExecuteBatch] Transaction created:`, newTx);
+
             targetBatch.skipTraceCount = estimate.eligibleCount;
             targetBatch.skipTraceCost = estimate.totalCost;
-            const activeTracks = clientRecordTrackings.filter(t => t.clientId === clientId && t.status === TrackingStatus.Active).sort((a,b) => b.finalAllocationPoints - a.finalAllocationPoints).slice(0, targetBatch.totalRecords);
+
+            // Mark records as skip traced
+            const targetTracks = clientRecordTrackings
+                .filter(t => t.clientId === clientId && t.status === TrackingStatus.Active)
+                .sort((a,b) => b.finalAllocationPoints - a.finalAllocationPoints)
+                .slice(0, targetBatch.totalRecords);
+            
             const sixMonthsAgo = new Date(Date.now() - 1000 * 60 * 60 * 24 * 180);
-            activeTracks.forEach(t => {
+            targetTracks.forEach(t => {
                 if (!t.skipTracedAt || new Date(t.skipTracedAt) < sixMonthsAgo) {
                     const prop = properties.find(p => p.id === t.propertyId);
                     if (prop) {
                         t.skipTracedAt = new Date().toISOString();
+                        t.touchCount += 1; // Execution increments touch count
                         skipTraces.push({ id: skipTraces.length + 1, contactId: prop.ownerId || 0, clientId, phone1: `555-${randomInt(100,999)}-${randomInt(1000,9999)}`, phone1Type: randomPick(['Mobile', 'Landline']), provider: 'Clearbit', cost: estimate.rate, createdAt: new Date().toISOString() });
                     }
+                } else {
+                    t.touchCount += 1; // Even already traced records in batch get a touch increment
                 }
             });
+        } else {
+            // If no trace but standard batch, still increment touch counts
+            const targetTracks = clientRecordTrackings
+                .filter(t => t.clientId === clientId && t.status === TrackingStatus.Active)
+                .sort((a,b) => b.finalAllocationPoints - a.finalAllocationPoints)
+                .slice(0, targetBatch.totalRecords);
+            targetTracks.forEach(t => t.touchCount += 1);
         }
+    } else {
+        // Standard batch execution: increment touch counts
+        const targetTracks = clientRecordTrackings
+            .filter(t => t.clientId === clientId && t.status === TrackingStatus.Active)
+            .sort((a,b) => b.finalAllocationPoints - a.finalAllocationPoints)
+            .slice(0, targetBatch.totalRecords);
+        targetTracks.forEach(t => t.touchCount += 1);
     }
 
     targetBatch.status = BatchStatus.Downloaded;
     if (!targetBatch.firstDownloadAt) targetBatch.firstDownloadAt = new Date().toISOString();
     targetBatch.downloadCount += 1;
     targetBatch.updatedAt = new Date().toISOString();
+    
+    console.log(`[ExecuteBatch] Batch ${targetBatch.batchId} execution complete.`);
     return { batch: targetBatch, csvData: [] };
   }
 };

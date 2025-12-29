@@ -69,10 +69,12 @@ export const InvestorDashboard = () => {
     // Skip Trace State
     const [includeSkipTrace, setIncludeSkipTrace] = useState(false);
     const [traceEstimate, setTraceEstimate] = useState<{ eligibleCount: number, alreadyTracedCount: number, rate: number, totalCost: number } | null>(null);
+    const [isEstimating, setIsEstimating] = useState(false);
 
     // Initial load to check if recently executed or to get stats
     useEffect(() => {
         const loadDashboardData = async () => {
+            console.log("[Dashboard] Loading Dashboard Data...");
             const [batches, statsData, clientData] = await Promise.all([
                 api.getWeeklyBatches(201),
                 api.getInvestorStats(201),
@@ -96,11 +98,24 @@ export const InvestorDashboard = () => {
         loadDashboardData();
     }, [batchExecuted]);
 
-    // Load Trace Estimates when modal opens
+    // Fetch Trace Estimates when modal opens
     useEffect(() => {
-        if (isModalOpen) {
-            api.getBatchSkipTraceEstimates(201).then(setTraceEstimate);
-        }
+        const fetchEstimate = async () => {
+            if (isModalOpen) {
+                setIsEstimating(true);
+                try {
+                    console.log("[Dashboard] Requesting Trace Estimate...");
+                    const est = await api.getBatchSkipTraceEstimates(201);
+                    console.log("[Dashboard] Received Estimate:", est);
+                    setTraceEstimate(est);
+                } catch (e) {
+                    console.error("[Dashboard] Estimate Fetch Error:", e);
+                } finally {
+                    setIsEstimating(false);
+                }
+            }
+        };
+        fetchEstimate();
     }, [isModalOpen]);
 
     const handleDownloadClick = () => {
@@ -139,6 +154,7 @@ export const InvestorDashboard = () => {
     };
 
     const executeBatch = async () => {
+        console.log("[Dashboard] Executing Batch Process...");
         setIsProcessing(true);
         try {
             const { batch, csvData } = await api.executeWeeklyBatch(201, { skipTrace: includeSkipTrace });
@@ -147,18 +163,21 @@ export const InvestorDashboard = () => {
             const csvContent = convertToCSV(csvData);
             downloadCSV(csvContent, `FirstPulse_Output_${batch.batchId}.csv`);
             
+            // Re-fetch client data to get persistent balance
+            const clientData = await api.getClientById(201);
+            if (clientData) {
+                setWalletBalance(clientData.skipTraceWalletBalance);
+                console.log("[Dashboard] Post-Execution Balance Sync:", clientData.skipTraceWalletBalance);
+            }
+
             setBatchExecuted(true);
             setLatestBatch(batch);
             setIsModalOpen(false);
             setToastMessage(`Batch downloaded successfully. ${batch.totalRecords} records exported.`);
             setTimeout(() => setToastMessage(null), 5000);
             
-            // Update balance locally
-            if (includeSkipTrace && traceEstimate) {
-                setWalletBalance(prev => prev - traceEstimate.totalCost);
-            }
         } catch (error: any) {
-            console.error(error);
+            console.error("[Dashboard] Execution Error:", error);
             alert(error.message || "Failed to generate batch.");
         } finally {
             setIsProcessing(false);
@@ -371,40 +390,54 @@ export const InvestorDashboard = () => {
                              </div>
                          </div>
 
-                         {includeSkipTrace && traceEstimate && (
+                         {includeSkipTrace && (
                              <div className="pt-4 border-t border-white/10 space-y-3">
-                                 <div className="flex justify-between text-xs">
-                                     <span className="text-gray-400">Records in batch</span>
-                                     <span className="text-white font-mono">{traceEstimate.eligibleCount + traceEstimate.alreadyTracedCount}</span>
-                                 </div>
-                                 <div className="flex justify-between text-xs">
-                                     <span className="text-gray-400">Already traced (skipped)</span>
-                                     <span className="text-gray-500 font-mono">-{traceEstimate.alreadyTracedCount}</span>
-                                 </div>
-                                 <div className="flex justify-between text-xs">
-                                     <span className="text-gray-400">Records to trace</span>
-                                     <span className="text-white font-mono">{traceEstimate.eligibleCount}</span>
-                                 </div>
-                                 <div className="flex justify-between text-xs">
-                                     <span className="text-gray-400">Cost per trace</span>
-                                     <span className="text-white font-mono">${traceEstimate.rate.toFixed(2)}</span>
-                                 </div>
-                                 <div className="flex justify-between text-sm pt-2 border-t border-white/5">
-                                     <span className="text-white font-bold">Estimated Total</span>
-                                     <span className="text-emerald-500 font-mono font-bold">${traceEstimate.totalCost.toFixed(2)}</span>
-                                 </div>
-                                 <div className="flex justify-between text-xs pt-2">
-                                     <span className="text-gray-500">Current Balance</span>
-                                     <span className="text-white font-mono">${walletBalance.toFixed(2)}</span>
-                                 </div>
-                                 <div className="flex justify-between text-xs">
-                                     <span className="text-gray-500">Balance After</span>
-                                     <span className="text-emerald-500 font-mono">${(walletBalance - traceEstimate.totalCost).toFixed(2)}</span>
-                                 </div>
-                                 {walletBalance < traceEstimate.totalCost && (
-                                     <div className="mt-2 text-xs text-red-500 flex items-center gap-1.5 bg-red-500/10 p-2 rounded border border-red-500/20">
-                                         <AlertTriangle size={12} />
-                                         Insufficient Wallet Balance
+                                 {isEstimating ? (
+                                     <div className="flex items-center justify-center py-4 gap-2 text-emerald-500 text-xs font-bold">
+                                         <Loader2 size={16} className="animate-spin" />
+                                         CALCULATING ENRICHMENT COST...
+                                     </div>
+                                 ) : traceEstimate ? (
+                                     <>
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-gray-400">Records in batch</span>
+                                            <span className="text-white font-mono">{traceEstimate.eligibleCount + traceEstimate.alreadyTracedCount}</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-gray-400">Already traced (skipped)</span>
+                                            <span className="text-gray-500 font-mono">-{traceEstimate.alreadyTracedCount}</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-gray-400">Records to trace</span>
+                                            <span className="text-white font-mono">{traceEstimate.eligibleCount}</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-gray-400">Cost per trace</span>
+                                            <span className="text-white font-mono">${(traceEstimate.rate || 0).toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm pt-2 border-t border-white/5">
+                                            <span className="text-white font-bold">Estimated Total</span>
+                                            <span className="text-emerald-500 font-mono font-bold">${(traceEstimate.totalCost || 0).toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs pt-2">
+                                            <span className="text-gray-500">Current Balance</span>
+                                            <span className="text-white font-mono">${walletBalance.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-gray-500">Balance After</span>
+                                            <span className="text-emerald-500 font-mono">${(walletBalance - (traceEstimate.totalCost || 0)).toFixed(2)}</span>
+                                        </div>
+                                        {walletBalance < (traceEstimate.totalCost || 0) && (
+                                            <div className="mt-2 text-xs text-red-500 flex items-center gap-1.5 bg-red-500/10 p-2 rounded border border-red-500/20">
+                                                <AlertTriangle size={12} />
+                                                Insufficient Wallet Balance
+                                            </div>
+                                        )}
+                                     </>
+                                 ) : (
+                                     <div className="text-xs text-amber-500 flex items-center gap-1.5 py-2">
+                                         <AlertTriangle size={14} />
+                                         Error fetching enrichment estimates.
                                      </div>
                                  )}
                              </div>

@@ -1,3 +1,4 @@
+
 import React, { ErrorInfo, ReactNode } from "react";
 import { AlertTriangle, RefreshCcw } from "lucide-react";
 
@@ -10,8 +11,7 @@ interface State {
   error: Error | null;
 }
 
-// Inheriting from React.Component with explicit generics to ensure 'props' and 'state' are correctly recognized by the TypeScript compiler.
-// Fix: Explicitly using React.Component ensures 'props' and 'state' are correctly inherited and accessible within the class.
+// Fixed: Explicitly extending React.Component with generic types Props and State ensures that 'props' and 'state' are correctly inherited and recognized by the TypeScript compiler.
 export class ErrorBoundary extends React.Component<Props, State> {
   public state: State = {
     hasError: false,
@@ -28,7 +28,11 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   public render() {
-    if (this.state.hasError) {
+    // Fixed: Destructuring state and props to ensure cleaner access and better type inference in the render scope.
+    const { hasError, error } = this.state;
+    const { children } = this.props;
+
+    if (hasError) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-[#050505] p-6">
           <div className="bg-[#111111] border border-white/10 rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
@@ -41,7 +45,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
             </p>
             <div className="bg-black/40 p-4 rounded-lg border border-white/5 mb-6 text-left">
                <code className="text-xs text-red-400 font-mono block break-words">
-                 {this.state.error?.message}
+                 {error?.message}
                </code>
             </div>
             <button
@@ -56,7 +60,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
       );
     }
 
-    // Return children from this.props which is correctly inherited from React.Component.
-    return this.props.children;
+    // Fixed: Return children correctly from destructured props to avoid inference issues on line 61.
+    return children;
   }
 }
