@@ -71,30 +71,29 @@ export const InvestorDashboard = () => {
     const [traceEstimate, setTraceEstimate] = useState<{ eligibleCount: number, alreadyTracedCount: number, rate: number, totalCost: number } | null>(null);
     const [isEstimating, setIsEstimating] = useState(false);
 
-    // Initial load to check if recently executed or to get stats
-    useEffect(() => {
-        const loadDashboardData = async () => {
-            console.log("[Dashboard] Loading Dashboard Data...");
-            const [batches, statsData, clientData] = await Promise.all([
-                api.getWeeklyBatches(201),
-                api.getInvestorStats(201),
-                api.getClientById(201)
-            ]);
-            
-            if (batches.length > 0) {
-                setLatestBatch(batches[0]);
-            }
-            setStats(statsData);
-            if (clientData) {
-                setWalletBalance(clientData.skipTraceWalletBalance);
-                
-                // Check if user has never downloaded a batch and hasn't dismissed the banner
-                const dismissed = localStorage.getItem('fp_welcome_dismissed');
-                if (!clientData.firstBatchGeneratedAt && dismissed !== 'true') {
-                    setShowWelcomeBanner(true);
-                }
+    // Initial load
+    const loadDashboardData = async () => {
+        console.log("[Dashboard] Refreshing Data...");
+        const [batches, statsData, clientData] = await Promise.all([
+            api.getWeeklyBatches(201),
+            api.getInvestorStats(201),
+            api.getClientById(201)
+        ]);
+        
+        if (batches.length > 0) {
+            setLatestBatch(batches[0]);
+        }
+        setStats(statsData);
+        if (clientData) {
+            setWalletBalance(clientData.skipTraceWalletBalance);
+            const dismissed = localStorage.getItem('fp_welcome_dismissed');
+            if (!clientData.firstBatchGeneratedAt && dismissed !== 'true') {
+                setShowWelcomeBanner(true);
             }
         }
+    };
+
+    useEffect(() => {
         loadDashboardData();
     }, [batchExecuted]);
 
@@ -104,9 +103,8 @@ export const InvestorDashboard = () => {
             if (isModalOpen) {
                 setIsEstimating(true);
                 try {
-                    console.log("[Dashboard] Requesting Trace Estimate...");
+                    console.log("[Dashboard] Fetching skip trace estimates...");
                     const est = await api.getBatchSkipTraceEstimates(201);
-                    console.log("[Dashboard] Received Estimate:", est);
                     setTraceEstimate(est);
                 } catch (e) {
                     console.error("[Dashboard] Estimate Fetch Error:", e);
@@ -131,11 +129,8 @@ export const InvestorDashboard = () => {
 
     const convertToCSV = (data: any[]) => {
         if (data.length === 0) return '';
-        const headers = Object.keys(data[0]);
-        const rows = data.map(obj => headers.map(header => {
-            const val = obj[header];
-            return `"${String(val).replace(/"/g, '""')}"`; // Escape quotes
-        }).join(','));
+        const headers = ['Address', 'City', 'State', 'Zip', 'Signal', 'Lane'];
+        const rows = data.map(obj => headers.map(header => `"${String(obj[header] || '').replace(/"/g, '""')}"`).join(','));
         return [headers.join(','), ...rows].join('\n');
     };
 
@@ -154,7 +149,7 @@ export const InvestorDashboard = () => {
     };
 
     const executeBatch = async () => {
-        console.log("[Dashboard] Executing Batch Process...");
+        console.log("[Dashboard] Executing Batch...");
         setIsProcessing(true);
         try {
             const { batch, csvData } = await api.executeWeeklyBatch(201, { skipTrace: includeSkipTrace });
@@ -163,21 +158,16 @@ export const InvestorDashboard = () => {
             const csvContent = convertToCSV(csvData);
             downloadCSV(csvContent, `FirstPulse_Output_${batch.batchId}.csv`);
             
-            // Re-fetch client data to get persistent balance
-            const clientData = await api.getClientById(201);
-            if (clientData) {
-                setWalletBalance(clientData.skipTraceWalletBalance);
-                console.log("[Dashboard] Post-Execution Balance Sync:", clientData.skipTraceWalletBalance);
-            }
+            // CRITICAL FIX: Refresh dashboard data to sync wallet balance from persistent mock backend
+            await loadDashboardData();
 
             setBatchExecuted(true);
-            setLatestBatch(batch);
             setIsModalOpen(false);
-            setToastMessage(`Batch downloaded successfully. ${batch.totalRecords} records exported.`);
+            setToastMessage(`Batch executed successfully. ${batch.totalRecords} records exported.`);
             setTimeout(() => setToastMessage(null), 5000);
             
         } catch (error: any) {
-            console.error("[Dashboard] Execution Error:", error);
+            console.error(error);
             alert(error.message || "Failed to generate batch.");
         } finally {
             setIsProcessing(false);
@@ -457,7 +447,7 @@ export const InvestorDashboard = () => {
                     <div className="p-3 bg-blue-900/10 border border-blue-500/20 rounded-lg flex gap-2 items-start">
                         <Users size={16} className="text-blue-400 shrink-0 mt-0.5" />
                         <p className="text-xs text-blue-300/80 leading-relaxed">
-                            <strong className="text-blue-400">Deduplication Protocol Active:</strong> {latestBatch?.duplicateContactsAvoided || 0} duplicate contacts consolidated. Owners with multiple properties will only receive marketing for their highest-priority asset.
+                            <strong className="text-blue-400">Deduplication Protocol Active:</strong> Consolidated leads. Owners with multiple properties will only receive marketing for their highest-priority asset.
                         </p>
                     </div>
 

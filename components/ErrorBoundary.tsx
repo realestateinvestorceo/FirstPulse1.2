@@ -1,5 +1,4 @@
-
-import React, { ErrorInfo, ReactNode } from "react";
+import React, { Component, ErrorInfo, ReactNode } from "react";
 import { AlertTriangle, RefreshCcw } from "lucide-react";
 
 interface Props {
@@ -11,8 +10,8 @@ interface State {
   error: Error | null;
 }
 
-// Fixed: Explicitly extending React.Component with generic types Props and State ensures that 'props' and 'state' are correctly inherited and recognized by the TypeScript compiler.
-export class ErrorBoundary extends React.Component<Props, State> {
+// Fix: Extending Component directly from named imports ensures that props and state are correctly inherited and accessible by the TypeScript compiler.
+export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
     error: null
@@ -28,7 +27,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   public render() {
-    // Fixed: Destructuring state and props to ensure cleaner access and better type inference in the render scope.
+    // Fix: Accessing state and props via this.state and this.props. Destructuring ensures the instance properties are correctly resolved within the render scope.
     const { hasError, error } = this.state;
     const { children } = this.props;
 
@@ -60,7 +59,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
       );
     }
 
-    // Fixed: Return children correctly from destructured props to avoid inference issues on line 61.
-    return children;
+    // Fix: Return null if children is undefined to satisfy React's return type requirements for the render method.
+    return children || null;
   }
 }

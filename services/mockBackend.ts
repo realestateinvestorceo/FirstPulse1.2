@@ -41,7 +41,6 @@ const ALL_US_COUNTIES = [
   { fips: '53033', name: 'King County', stateCode: 'WA', state: 'Washington' },
 ];
 
-// Seed logic usually fills this, but we'll export it for the typeahead
 export const getFullCountyRegistry = () => ALL_US_COUNTIES;
 
 // --- Data Stores ---
@@ -156,18 +155,14 @@ const seedClientSettings = () => {
   ];
 };
 
-const randomTagsWithBias = (id: number) => {
-  if (id === 99) return ['foreclosure', 'vacant'];
-  return randomTags();
-}
-
 const runScoringEngine = () => {
-  const investorId = 201;
-  const targetProperties = properties;
-  
+  console.log("[Engine] Running Scoring Engine for initial pool seeding...");
   let trackingIdCounter = 1;
 
-  clientRecordTrackings = targetProperties.map(property => {
+  properties.forEach(property => {
+    // CRITICAL FIX: Only create tracking records if the property belongs to a client
+    if (!property.clientId) return;
+
     let baseScore = 0;
     let highestPriorityLane: Lane = 'Nurture';
     let hasBlitz = false;
@@ -192,9 +187,9 @@ const runScoringEngine = () => {
     const sources: SourceType[] = ['Fresh', 'Fresh', 'Fresh', 'Repeat', 'Queue'];
     const sourceType = randomPick(sources);
 
-    return {
+    clientRecordTrackings.push({
       id: trackingIdCounter++,
-      clientId: investorId,
+      clientId: property.clientId,
       propertyId: property.id,
       lane: highestPriorityLane,
       status: TrackingStatus.Active,
@@ -205,9 +200,10 @@ const runScoringEngine = () => {
       sourceType: sourceType,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
-    };
+    });
   });
   
+  // Apply specific cooldowns for demo data
   const cooldownIds = [5, 12, 18, 25];
   clientRecordTrackings.forEach(t => {
       if (cooldownIds.includes(t.propertyId)) {
@@ -218,14 +214,14 @@ const runScoringEngine = () => {
       }
   });
 
-  const tracedPropId = 99;
-  const tracedProp = properties.find(p => p.id === tracedPropId);
-  const tracedTracking = clientRecordTrackings.find(t => t.propertyId === tracedPropId);
-  if (tracedProp && tracedTracking) {
+  // Seed one historical skip trace
+  const tracedPropId = 9; // Property ID 9 is owned by Client 201 (9%3==0)
+  const tracedTracking = clientRecordTrackings.find(t => t.propertyId === tracedPropId && t.clientId === 201);
+  if (tracedTracking) {
       tracedTracking.skipTracedAt = new Date(Date.now() - 1000 * 60 * 60 * 24 * 60).toISOString();
       skipTraces.push({
           id: 1,
-          contactId: tracedProp.ownerId || 0,
+          contactId: 1,
           clientId: 201,
           phone1: '555-012-3456',
           phone1Type: 'Mobile',
@@ -282,7 +278,7 @@ export const initializeDatabase = () => {
       addressState: loc.state,
       addressPostalCode: (loc.zipBase + randomInt(1, 99)).toString(),
       propertyType: randomPick(PROPERTY_TYPES),
-      tags: i === 99 ? ['foreclosure', 'vacant'] : randomTags(),
+      tags: randomTags(),
       estimatedValue: randomInt(150000, 850000),
       equityPercent: randomInt(10, 100),
       createdAt: new Date().toISOString(),
@@ -290,22 +286,6 @@ export const initializeDatabase = () => {
     });
   }
 
-  for (let i = 1; i <= 20; i++) {
-    const loc = randomPick(SEED_COUNTIES_CONFIG);
-    contacts.push({
-      id: i,
-      clientId: 201,
-      fullName: `Contact Owner ${i}`,
-      ownerType: randomPick(['Individual', 'Trust', 'LLC']),
-      addressLine1: `${randomInt(100, 9999)} ${randomPick(STREET_NAMES)} ${randomPick(['St', 'Ave'])}`,
-      addressCity: loc.city,
-      addressState: loc.state,
-      addressPostalCode: (loc.zipBase + randomInt(1, 99)).toString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    });
-  }
-  
   seedDistressSignals();
   seedCounties();
   seedSystemDefaults();
@@ -314,15 +294,14 @@ export const initializeDatabase = () => {
   runScoringEngine();
 
   suppressionLists = [
-    { id: 1, clientId: 201, fileName: 'Do Not Call - Global.csv', suppressionType: 'phone', recordCount: 8200, isActive: true, createdAt: new Date().toISOString() },
-    { id: 2, clientId: 201, fileName: 'Litigator Scrub.csv', suppressionType: 'owner_name', recordCount: 450, isActive: true, createdAt: new Date().toISOString() },
-    { id: 3, clientId: 201, fileName: 'Previous Buyers.csv', suppressionType: 'address', recordCount: 3753, isActive: true, createdAt: new Date().toISOString() }
+    { id: 1, clientId: 201, fileName: 'Do Not Call - Global.csv', suppressionType: 'phone', recordCount: 8200, isActive: true, createdAt: new Date().toISOString() }
   ];
 
   transactions = [
     { id: 1, clientId: 201, protocolEvent: "INITIAL WALLET LOADING", settlementAmount: 425.50, timestamp: "2025-12-20T02:38:00" }
   ];
 
+  // Seeded historical batch for Sarah (already downloaded)
   weeklyBatches = [
     {
       id: 1,
@@ -376,7 +355,6 @@ export const api = {
   getAllClients: async () => clients,
   getCounties: async () => counties,
 
-  // High performance search for provisioning
   searchFullCountyRegistry: async (query: string) => {
     const q = query.toLowerCase();
     return ALL_US_COUNTIES.filter(c => 
@@ -384,26 +362,6 @@ export const api = {
       c.state.toLowerCase().includes(q) || 
       c.fips.includes(q)
     ).slice(0, 10);
-  },
-
-  provisionTerritory: async (fips: string) => {
-    const existing = counties.find(c => c.fips === fips);
-    if (existing) return existing;
-
-    const ref = ALL_US_COUNTIES.find(c => c.fips === fips);
-    if (!ref) throw new Error("Invalid FIPS code");
-
-    const newCounty: County = {
-      ...ref,
-      population: 0,
-      status: 'Pending',
-      activeClients: 1,
-      lastDataPull: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    counties.push(newCounty);
-    return newCounty;
   },
 
   getSystemDefaults: async () => systemDefaults,
@@ -468,155 +426,87 @@ export const api = {
      const client = clients.find(c => c.id === clientId);
      if (!client) throw new Error("Client not found");
      const settings = await api.getClientSettings(clientId);
-     const allProperties = properties;
-
-     const eligibleProperties = allProperties.filter(p => {
+     
+     // 1. Filter Pool
+     const eligibleProperties = properties.filter(p => {
+        if (p.clientId !== clientId) return false;
         if (settings.buyBox.counties.length > 0 && !settings.buyBox.counties.includes(p.fips)) return false;
         if (p.estimatedValue > settings.buyBox.maxPrice) return false;
         if (p.equityPercent < settings.buyBox.minEquity) return false;
-        if (settings.buyBox.propertyTypes.length > 0 && p.propertyType && !settings.buyBox.propertyTypes.includes(p.propertyType)) return false;
-        if (settings.buyBox.excludedZips && settings.buyBox.excludedZips.includes(p.addressPostalCode)) return false;
         return true;
      });
 
-     const trackedRecords: ClientRecordTracking[] = [];
+     // 2. Refresh scores/status
      const now = new Date();
-     
      eligibleProperties.forEach(prop => {
         let tracking = clientRecordTrackings.find(t => t.clientId === clientId && t.propertyId === prop.id);
-        let baseScore = 0;
-        let lane: Lane = 'Nurture';
-        let hasBlitz = false, hasChase = false;
-        
-        prop.tags.forEach(tag => {
-           const signal = distressSignals.find(s => s.signalKey === tag);
-           if (signal) {
-               baseScore += signal.baseConversionRate;
-               if (signal.defaultLane === 'Blitz') hasBlitz = true;
-               if (signal.defaultLane === 'Chase') hasChase = true;
-           }
-        });
-
-        if (hasBlitz) lane = 'Blitz';
-        else if (hasChase) lane = 'Chase';
-        
-        if (!tracking) {
-            tracking = { id: clientRecordTrackings.length + 1, clientId, propertyId: prop.id, lane, status: TrackingStatus.Active, baseScore, effectiveScore: baseScore, finalAllocationPoints: baseScore * 100, touchCount: 0, sourceType: 'Fresh', createdAt: now.toISOString(), updatedAt: now.toISOString() };
-            clientRecordTrackings.push(tracking);
-        } else {
-            tracking.baseScore = baseScore;
-            tracking.lane = lane;
-            tracking.effectiveScore = baseScore * Math.pow(0.5, tracking.touchCount);
-            tracking.finalAllocationPoints = tracking.effectiveScore * 100;
+        if (tracking) {
+            tracking.effectiveScore = tracking.baseScore * Math.pow(0.5, tracking.touchCount);
+            tracking.finalAllocationPoints = Number((tracking.effectiveScore * 100).toFixed(2));
         }
-
-        if (tracking.status === TrackingStatus.CoolingDown) {
-            if (tracking.cooldownEndAt && new Date(tracking.cooldownEndAt) <= now) {
-                tracking.status = TrackingStatus.Active;
-                tracking.cooldownStartAt = undefined;
-                tracking.cooldownEndAt = undefined;
-                tracking.touchCount = 0;
-            }
-        }
-
-        if (tracking.status === TrackingStatus.Active) {
-            let maxTouches = 10;
-            if (tracking.lane === 'Blitz') maxTouches = settings.cadence.blitzMaxTouches;
-            if (tracking.lane === 'Chase') maxTouches = settings.cadence.chaseMaxTouches;
-            if (tracking.lane === 'Nurture') maxTouches = settings.cadence.nurtureMaxTouches;
-
-            const scoreFloor = 0.10;
-            
-            if (tracking.touchCount >= maxTouches || tracking.finalAllocationPoints < scoreFloor) {
-                tracking.status = TrackingStatus.CoolingDown;
-                tracking.cooldownStartAt = now.toISOString();
-                const endDate = new Date(now);
-                endDate.setMonth(endDate.getMonth() + 6);
-                tracking.cooldownEndAt = endDate.toISOString();
-            }
-        }
-        trackedRecords.push(tracking);
      });
 
-     const candidates = trackedRecords.filter(t => t.status === TrackingStatus.Active && (t.touchCount === 0 || (t.nextEligibleAt && new Date(t.nextEligibleAt) <= now)));
-     const recordsByOwner = new Map<number, ClientRecordTracking[]>();
-     candidates.forEach(record => {
-       const prop = properties.find(p => p.id === record.propertyId);
-       const ownerId = prop?.ownerId || 0;
-       if (!recordsByOwner.has(ownerId)) recordsByOwner.set(ownerId, []);
-       recordsByOwner.get(ownerId)!.push(record);
-     });
+     // 3. Selection
+     const candidates = clientRecordTrackings
+        .filter(t => t.clientId === clientId && t.status === TrackingStatus.Active)
+        .sort((a,b) => b.finalAllocationPoints - a.finalAllocationPoints);
 
-     const finalSelection: ClientRecordTracking[] = [];
-     recordsByOwner.forEach((records) => {
-         records.sort((a,b) => b.finalAllocationPoints - a.finalAllocationPoints);
-         finalSelection.push(records[0]);
-     });
-
-     finalSelection.sort((a,b) => b.finalAllocationPoints - a.finalAllocationPoints);
-     const batchRecordsList = finalSelection.slice(0, client.weeklyCapacity);
+     const batchRecordsList = candidates.slice(0, client.weeklyCapacity);
      if (batchRecordsList.length === 0) throw new Error("No eligible records found");
 
      const weekNum = Math.floor(now.getDate() / 7) + 1;
      const newBatch: WeeklyBatch = {
         id: weeklyBatches.length + 1, clientId, batchId: `${clientId}-${now.getFullYear()}-W${weekNum}-${Date.now()}`,
         weekStart: now.toISOString().split('T')[0], weekEnd: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        totalRecords: batchRecordsList.length, freshCount: batchRecordsList.filter(r => r.touchCount === 0).length,
-        repeatCount: batchRecordsList.filter(r => r.touchCount > 0).length, queueCount: candidates.length - batchRecordsList.length,
-        blitzCount: batchRecordsList.filter(r => r.lane === 'Blitz').length, chaseCount: batchRecordsList.filter(r => r.lane === 'Chase').length,
-        nurtureCount: batchRecordsList.filter(r => r.lane === 'Nurture').length, skipTraceCount: 0, skipTraceCost: 0,
-        duplicateContactsAvoided: candidates.length - finalSelection.length, status: BatchStatus.Generated, generatedAt: now.toISOString(), downloadCount: 0, createdAt: now.toISOString(), updatedAt: now.toISOString()
+        totalRecords: batchRecordsList.length, 
+        freshCount: batchRecordsList.filter(r => r.touchCount === 0).length,
+        repeatCount: batchRecordsList.filter(r => r.touchCount > 0).length, 
+        queueCount: candidates.length - batchRecordsList.length,
+        blitzCount: batchRecordsList.filter(r => r.lane === 'Blitz').length, 
+        chaseCount: batchRecordsList.filter(r => r.lane === 'Chase').length,
+        nurtureCount: batchRecordsList.filter(r => r.lane === 'Nurture').length, 
+        skipTraceCount: 0, skipTraceCost: 0,
+        duplicateContactsAvoided: 0, status: BatchStatus.Generated, generatedAt: now.toISOString(), downloadCount: 0, createdAt: now.toISOString(), updatedAt: now.toISOString()
      };
      weeklyBatches.push(newBatch);
-     
-     // Persistence check: batch records are not strictly persisted in an IDs array in this mock but we identify the batch by status 'Generated'
      if (!client.firstBatchGeneratedAt) client.firstBatchGeneratedAt = now.toISOString();
-     console.log(`[GenerateBatch] Batch ${newBatch.batchId} created with ${newBatch.totalRecords} records.`);
      return newBatch;
   },
 
   getBatchSkipTraceEstimates: async (clientId: number) => {
       console.log(`[Estimates] Calculating for clientId: ${clientId}`);
       const client = clients.find(c => c.id === clientId);
-      if (!client) {
-          console.warn(`[Estimates] Client ${clientId} not found.`);
-          return { eligibleCount: 0, alreadyTracedCount: 0, rate: 0.06, totalCost: 0 };
-      }
+      if (!client) return { eligibleCount: 0, alreadyTracedCount: 0, rate: 0.12, totalCost: 0 };
 
       const partnerConfigs = await api.getPartnerConfig(client.partnerId || 0);
       const rateStr = partnerConfigs.find(c => c.settingKey === 'skip_trace_rate')?.settingValue;
-      const rate = rateStr ? parseFloat(rateStr) : 0.06;
+      const rate = rateStr ? parseFloat(rateStr) : 0.12;
 
-      // Find the specific 'Generated' batch records.
-      // In the real system, batch_records links properties to a batch.
-      // In this mock, we re-run the selection logic to identify which records would be in the current generated batch.
+      // Find 'Generated' batch if it exists
       const batch = weeklyBatches
         .filter(b => b.clientId === clientId && b.status === BatchStatus.Generated)
         .sort((a, b) => b.id - a.id)[0];
       
-      const targetCount = batch ? batch.totalRecords : client.weeklyCapacity;
-      console.log(`[Estimates] Target record count for estimation: ${targetCount} (Source: ${batch ? 'Batch' : 'Capacity Fallback'})`);
+      // CRITICAL FIX: The estimate should only consider records that WILL be in the batch.
+      const targetCount = batch ? batch.totalRecords : Math.min(client.weeklyCapacity, clientRecordTrackings.filter(t => t.clientId === clientId && t.status === TrackingStatus.Active).length);
+      
+      console.log(`[Estimates] Target record count for batch: ${targetCount}`);
 
-      // Selection logic matching generateWeeklyBatch
-      const activeTracks = clientRecordTrackings
+      // Selection logic matching batch generation
+      const batchRecordsCandidates = clientRecordTrackings
         .filter(t => t.clientId === clientId && t.status === TrackingStatus.Active)
         .sort((a,b) => b.finalAllocationPoints - a.finalAllocationPoints)
         .slice(0, targetCount);
 
-      if (activeTracks.length === 0) {
-          console.warn(`[Estimates] No active tracks found for client ${clientId}. Pool empty.`);
-          return { 
-            eligibleCount: 0, 
-            alreadyTracedCount: 0, 
-            rate, 
-            totalCost: 0 
-          };
+      if (batchRecordsCandidates.length === 0) {
+          return { eligibleCount: 0, alreadyTracedCount: 0, rate, totalCost: 0 };
       }
 
       const sixMonthsAgo = new Date(Date.now() - 1000 * 60 * 60 * 24 * 180);
-      const eligibleRecords = activeTracks.filter(t => !t.skipTracedAt || new Date(t.skipTracedAt) < sixMonthsAgo);
-      const eligibleCount = eligibleRecords.length;
-      const alreadyTracedCount = activeTracks.length - eligibleCount;
+      const eligibleRecordsSubset = batchRecordsCandidates.filter(t => !t.skipTracedAt || new Date(t.skipTracedAt) < sixMonthsAgo);
+      
+      const eligibleCount = eligibleRecordsSubset.length;
+      const alreadyTracedCount = batchRecordsCandidates.length - eligibleCount;
 
       const result = { 
         eligibleCount, 
@@ -624,7 +514,7 @@ export const api = {
         rate, 
         totalCost: Number((eligibleCount * rate).toFixed(2))
       };
-      console.log(`[Estimates] Calculation Success:`, result);
+      console.log(`[Estimates] Calculation Complete:`, result);
       return result;
   },
 
@@ -633,7 +523,7 @@ export const api = {
 
   getProperties: async (clientId?: number) => {
     await new Promise(resolve => setTimeout(resolve, 300));
-    return clientId ? properties.map(p => ({ ...p, _tracking: clientRecordTrackings.find(t => t.propertyId === p.id && t.clientId === clientId) })) : properties;
+    return clientId ? properties.filter(p => p.clientId === clientId).map(p => ({ ...p, _tracking: clientRecordTrackings.find(t => t.propertyId === p.id && t.clientId === clientId) })) : properties;
   },
 
   getTrackingRecords: async (clientId: number) => clientRecordTrackings.filter(t => t.clientId === clientId),
@@ -651,67 +541,44 @@ export const api = {
 
     let targetBatch = weeklyBatches.filter(b => b.clientId === clientId && b.status === BatchStatus.Generated).sort((a,b) => b.id - a.id)[0];
     if (!targetBatch) {
-        console.log(`[ExecuteBatch] No existing Generated batch found. Triggering on-the-fly generation.`);
         targetBatch = await api.generateWeeklyBatch(clientId);
     }
 
     if (options?.skipTrace) {
         const estimate = await api.getBatchSkipTraceEstimates(clientId);
-        console.log(`[ExecuteBatch] Skip Trace requested. Estimate:`, estimate);
         if (estimate && estimate.eligibleCount > 0) {
             if (client.skipTraceWalletBalance < estimate.totalCost) {
-                console.error(`[ExecuteBatch] Insufficient funds: ${client.skipTraceWalletBalance} < ${estimate.totalCost}`);
-                throw new Error("Insufficient wallet balance for skip trace enrichment.");
+                throw new Error("Insufficient wallet balance for enrichment.");
             }
             
-            // Deduct from wallet
-            const previousBalance = client.skipTraceWalletBalance;
+            // Persist the balance change
             client.skipTraceWalletBalance = Number((client.skipTraceWalletBalance - estimate.totalCost).toFixed(2));
-            console.log(`[ExecuteBatch] Wallet Updated: ${previousBalance} -> ${client.skipTraceWalletBalance}`);
-
+            
             // Log Transaction
-            const newTx: Transaction = { 
+            transactions.push({ 
                 id: transactions.length + 1, 
                 clientId, 
                 protocolEvent: 'SKIP TRACE BATCH ENRICHMENT', 
                 settlementAmount: -estimate.totalCost, 
                 timestamp: new Date().toISOString() 
-            };
-            transactions.push(newTx);
-            console.log(`[ExecuteBatch] Transaction created:`, newTx);
+            });
 
             targetBatch.skipTraceCount = estimate.eligibleCount;
             targetBatch.skipTraceCost = estimate.totalCost;
 
-            // Mark records as skip traced
+            // Mark tracking records as traced
             const targetTracks = clientRecordTrackings
                 .filter(t => t.clientId === clientId && t.status === TrackingStatus.Active)
                 .sort((a,b) => b.finalAllocationPoints - a.finalAllocationPoints)
                 .slice(0, targetBatch.totalRecords);
             
-            const sixMonthsAgo = new Date(Date.now() - 1000 * 60 * 60 * 24 * 180);
             targetTracks.forEach(t => {
-                if (!t.skipTracedAt || new Date(t.skipTracedAt) < sixMonthsAgo) {
-                    const prop = properties.find(p => p.id === t.propertyId);
-                    if (prop) {
-                        t.skipTracedAt = new Date().toISOString();
-                        t.touchCount += 1; // Execution increments touch count
-                        skipTraces.push({ id: skipTraces.length + 1, contactId: prop.ownerId || 0, clientId, phone1: `555-${randomInt(100,999)}-${randomInt(1000,9999)}`, phone1Type: randomPick(['Mobile', 'Landline']), provider: 'Clearbit', cost: estimate.rate, createdAt: new Date().toISOString() });
-                    }
-                } else {
-                    t.touchCount += 1; // Even already traced records in batch get a touch increment
-                }
+                t.skipTracedAt = new Date().toISOString();
+                t.touchCount += 1; // Execution increments touch count
             });
-        } else {
-            // If no trace but standard batch, still increment touch counts
-            const targetTracks = clientRecordTrackings
-                .filter(t => t.clientId === clientId && t.status === TrackingStatus.Active)
-                .sort((a,b) => b.finalAllocationPoints - a.finalAllocationPoints)
-                .slice(0, targetBatch.totalRecords);
-            targetTracks.forEach(t => t.touchCount += 1);
         }
     } else {
-        // Standard batch execution: increment touch counts
+        // Standard execution: just increment touches
         const targetTracks = clientRecordTrackings
             .filter(t => t.clientId === clientId && t.status === TrackingStatus.Active)
             .sort((a,b) => b.finalAllocationPoints - a.finalAllocationPoints)
@@ -724,7 +591,6 @@ export const api = {
     targetBatch.downloadCount += 1;
     targetBatch.updatedAt = new Date().toISOString();
     
-    console.log(`[ExecuteBatch] Batch ${targetBatch.batchId} execution complete.`);
     return { batch: targetBatch, csvData: [] };
   }
 };
