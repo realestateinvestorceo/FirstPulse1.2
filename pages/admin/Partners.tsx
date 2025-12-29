@@ -5,7 +5,7 @@ import { Modal } from '../../components/ui/Modal';
 import { Toast } from '../../components/ui/Toast';
 import { api } from '../../services/mockBackend';
 import { Partner } from '../../types';
-import { Plus, Mail, Phone, MoreHorizontal, Users } from 'lucide-react';
+import { Plus, Mail, Phone, MoreHorizontal, Users, Edit, Power, Key, Eye, EyeOff } from 'lucide-react';
 
 export const Partners = () => {
   const [partners, setPartners] = useState<Partner[]>([]);
@@ -13,8 +13,27 @@ export const Partners = () => {
   const [newPartner, setNewPartner] = useState({ name: '', email: '', phone: '' });
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Actions Menu State
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  
+  // Edit State
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingPartner, setEditingPartner] = useState<Partner | null>(null);
+
+  // Set Password State
+  const [isSetPasswordOpen, setIsSetPasswordOpen] = useState(false);
+  const [passwordToSet, setPasswordToSet] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
   useEffect(() => {
     api.getPartners().then(setPartners);
+  }, []);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setOpenMenuId(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
   }, []);
 
   const handleCreatePartner = () => {
@@ -34,6 +53,48 @@ export const Partners = () => {
     setIsAddOpen(false);
     setNewPartner({ name: '', email: '', phone: '' });
     setToastMessage("Partner added successfully");
+  };
+
+  const toggleMenu = (e: React.MouseEvent, id: number) => {
+      e.stopPropagation();
+      setOpenMenuId(openMenuId === id ? null : id);
+  };
+
+  const handleEditClick = (partner: Partner) => {
+      setEditingPartner({ ...partner });
+      setIsEditOpen(true);
+      setOpenMenuId(null);
+  };
+
+  const handleSaveEdit = () => {
+      if (!editingPartner || !editingPartner.name || !editingPartner.email) return;
+      
+      setPartners(prev => prev.map(p => p.id === editingPartner.id ? editingPartner : p));
+      setIsEditOpen(false);
+      setEditingPartner(null);
+      setToastMessage("Partner updated successfully");
+  };
+
+  const handleToggleStatus = (id: number, currentStatus: boolean) => {
+      setPartners(prev => prev.map(p => p.id === id ? { ...p, isActive: !currentStatus } : p));
+      setOpenMenuId(null);
+      setToastMessage(currentStatus ? "Partner deactivated" : "Partner activated");
+  };
+
+  const handleSetPasswordClick = (partner: Partner) => {
+      setEditingPartner(partner);
+      setPasswordToSet('');
+      setShowPassword(false);
+      setIsSetPasswordOpen(true);
+      setOpenMenuId(null);
+  };
+
+  const handleSavePassword = () => {
+      if (!passwordToSet) return;
+      // In a real app, we would call an API here
+      setToastMessage(`Password updated for ${editingPartner?.name}`);
+      setIsSetPasswordOpen(false);
+      setEditingPartner(null);
   };
 
   return (
@@ -56,7 +117,7 @@ export const Partners = () => {
 
       <Card>
         <CardHeader title="All Partners" />
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-h-[300px]">
           <table className="w-full text-left text-sm text-gray-400">
             <thead className="bg-white/5 text-gray-200 uppercase text-xs font-medium">
               <tr>
@@ -91,10 +152,42 @@ export const Partners = () => {
                       {partner.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="text-gray-500 hover:text-white p-2">
+                  <td className="px-6 py-4 text-right relative">
+                    <button 
+                        onClick={(e) => toggleMenu(e, partner.id)}
+                        className={`p-2 rounded hover:bg-white/10 transition-colors ${openMenuId === partner.id ? 'text-white bg-white/10' : 'text-gray-500 hover:text-white'}`}
+                    >
                       <MoreHorizontal size={18} />
                     </button>
+                    
+                    {/* Actions Dropdown */}
+                    {openMenuId === partner.id && (
+                        <div className="absolute right-8 top-8 w-48 bg-[#111111] border border-white/10 rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                            <div className="py-1">
+                                <button 
+                                    onClick={() => handleEditClick(partner)}
+                                    className="w-full px-4 py-2.5 text-left text-sm text-gray-300 hover:bg-white/5 hover:text-white flex items-center gap-2 transition-colors"
+                                >
+                                    <Edit size={14} />
+                                    Edit Details
+                                </button>
+                                <button 
+                                    onClick={() => handleToggleStatus(partner.id, partner.isActive)}
+                                    className="w-full px-4 py-2.5 text-left text-sm text-gray-300 hover:bg-white/5 hover:text-white flex items-center gap-2 transition-colors"
+                                >
+                                    <Power size={14} className={partner.isActive ? "text-red-400" : "text-emerald-400"} />
+                                    {partner.isActive ? "Deactivate" : "Activate"}
+                                </button>
+                                <button 
+                                    onClick={() => handleSetPasswordClick(partner)}
+                                    className="w-full px-4 py-2.5 text-left text-sm text-gray-300 hover:bg-white/5 hover:text-white flex items-center gap-2 transition-colors"
+                                >
+                                    <Key size={14} />
+                                    Set Password
+                                </button>
+                            </div>
+                        </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -103,6 +196,7 @@ export const Partners = () => {
         </div>
       </Card>
 
+      {/* Add Partner Modal */}
       <Modal 
         isOpen={isAddOpen} 
         onClose={() => setIsAddOpen(false)} 
@@ -143,6 +237,94 @@ export const Partners = () => {
           >
             Create Partner
           </button>
+        </div>
+      </Modal>
+
+      {/* Edit Partner Modal */}
+      <Modal 
+        isOpen={isEditOpen} 
+        onClose={() => setIsEditOpen(false)} 
+        title="Edit Partner Details"
+        icon={<Edit className="text-emerald-500" />}
+      >
+        {editingPartner && (
+            <div className="space-y-4">
+                <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Partner Name</label>
+                    <input 
+                    value={editingPartner.name} 
+                    onChange={e => setEditingPartner({...editingPartner, name: e.target.value})} 
+                    className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors" 
+                    />
+                </div>
+                <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Email / Login</label>
+                    <input 
+                    value={editingPartner.email} 
+                    onChange={e => setEditingPartner({...editingPartner, email: e.target.value})} 
+                    className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors" 
+                    />
+                </div>
+                <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Phone</label>
+                    <input 
+                    value={editingPartner.phone} 
+                    onChange={e => setEditingPartner({...editingPartner, phone: e.target.value})} 
+                    className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors" 
+                    />
+                </div>
+                <button 
+                    onClick={handleSaveEdit}
+                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-black font-bold rounded-lg transition-colors mt-2"
+                >
+                    Save Changes
+                </button>
+            </div>
+        )}
+      </Modal>
+
+      {/* Set Password Modal */}
+      <Modal 
+        isOpen={isSetPasswordOpen} 
+        onClose={() => setIsSetPasswordOpen(false)} 
+        title={`Set Password for ${editingPartner?.name}`}
+        icon={<Key className="text-emerald-500" />}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">New Password</label>
+            <div className="relative">
+              <input 
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••" 
+                value={passwordToSet} 
+                onChange={e => setPasswordToSet(e.target.value)} 
+                className="w-full bg-black border border-white/10 rounded-lg pl-4 pr-10 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors" 
+              />
+              <button 
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+          <div className="flex gap-3 mt-2">
+            <button 
+                onClick={() => setIsSetPasswordOpen(false)}
+                className="flex-1 py-3 border border-white/10 text-gray-400 font-bold rounded-lg transition-colors hover:bg-white/5"
+            >
+                Cancel
+            </button>
+            <button 
+                onClick={handleSavePassword}
+                disabled={!passwordToSet}
+                className={`flex-1 py-3 font-bold rounded-lg transition-colors ${!passwordToSet ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-black'}`}
+            >
+                Save Password
+            </button>
+          </div>
         </div>
       </Modal>
     </div>

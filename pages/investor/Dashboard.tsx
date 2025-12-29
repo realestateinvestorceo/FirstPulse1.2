@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
@@ -16,24 +17,28 @@ import {
   Search,
   Map,
   TrendingUp,
-  Clock
+  Clock,
+  X,
+  BookOpen
 } from 'lucide-react';
 
-const Counter = ({ label, value, brightness = 'text-white' }: { label: string; value: string; brightness?: string }) => (
+const Counter = ({ label, sublabel, value, brightness = 'text-white' }: { label: string; sublabel: string; value: string; brightness?: string }) => (
   <div className="flex flex-col">
-    <span className="text-xs text-gray-500 font-medium tracking-wider mb-2">{label}</span>
+    <span className="text-xs text-gray-500 font-medium tracking-wider mb-1 uppercase">{label}</span>
     <span className={`text-4xl font-mono font-bold ${brightness}`}>{value}</span>
+    <span className="text-[10px] text-gray-600 font-bold uppercase tracking-tight mt-1">{sublabel}</span>
   </div>
 );
 
-const LaneCard = ({ label, value, color, dotColor }: { label: string; value: string; color?: string; dotColor: string }) => (
+const LaneCard = ({ label, sublabel, value, color, dotColor }: { label: string; sublabel: string; value: string; color?: string; dotColor: string }) => (
   <Card className="flex-1 bg-[#111111] border-white/5 hover:border-white/10 transition-colors">
     <div className="p-5">
         <div className="flex items-center gap-2 mb-3">
             <div className={`w-2 h-2 rounded-full ${dotColor}`} />
             <span className="text-xs text-gray-400 font-bold tracking-wider">{label}</span>
         </div>
-        <div className="text-3xl font-mono text-white font-medium">{value}</div>
+        <div className="text-3xl font-mono text-white font-medium mb-1">{value}</div>
+        <div className="text-[10px] text-gray-600 font-bold uppercase tracking-tight">{sublabel}</div>
     </div>
   </Card>
 );
@@ -46,25 +51,9 @@ const Toast = ({ message, onClose }: { message: string, onClose: () => void }) =
      <div className="flex-1">
          <p className="text-sm font-medium">{message}</p>
      </div>
-     <button onClick={onClose} className="text-gray-500 hover:text-white ml-2"><span className="sr-only">Close</span>×</button>
+     <button onClick={onClose} className="text-gray-500 hover:text-white ml-2"><X size={16} /></button>
   </div>
 );
-
-// Mock Data for New Sections
-const VELOCITY_DATA = [
-    { zip: '60614', status: 'HOT', bg: 'bg-amber-500/10', text: 'text-amber-500', border: 'border-amber-500/20' },
-    { zip: '60657', status: 'HOT', bg: 'bg-amber-500/10', text: 'text-amber-500', border: 'border-amber-500/20' },
-    { zip: '60618', status: 'WARM', bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20' },
-    { zip: '77007', status: 'WARM', bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20' },
-    { zip: '77019', status: 'HOT', bg: 'bg-amber-500/10', text: 'text-amber-500', border: 'border-amber-500/20' },
-];
-
-const SOLD_PULSE_DATA = [
-    { address: '1234 Oak St', price: 425000, time: '2 days ago' },
-    { address: '5678 Maple Ave', price: 315000, time: '4 days ago' },
-    { address: '9012 Pine Ln', price: 550000, time: '1 week ago' },
-    { address: '3456 Cedar Dr', price: 289000, time: '1 week ago' },
-];
 
 export const InvestorDashboard = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -75,6 +64,7 @@ export const InvestorDashboard = () => {
     const [latestBatch, setLatestBatch] = useState<WeeklyBatch | null>(null);
     const [stats, setStats] = useState<{ active: number, cooldown: number, removed: number } | null>(null);
     const [walletBalance, setWalletBalance] = useState(0);
+    const [showWelcomeBanner, setShowWelcomeBanner] = useState(false);
     
     // Skip Trace State
     const [includeSkipTrace, setIncludeSkipTrace] = useState(false);
@@ -93,7 +83,15 @@ export const InvestorDashboard = () => {
                 setLatestBatch(batches[0]);
             }
             setStats(statsData);
-            if (clientData) setWalletBalance(clientData.skipTraceWalletBalance);
+            if (clientData) {
+                setWalletBalance(clientData.skipTraceWalletBalance);
+                
+                // Check if user has never downloaded a batch and hasn't dismissed the banner
+                const dismissed = localStorage.getItem('fp_welcome_dismissed');
+                if (!clientData.firstBatchGeneratedAt && dismissed !== 'true') {
+                    setShowWelcomeBanner(true);
+                }
+            }
         }
         loadDashboardData();
     }, [batchExecuted]);
@@ -109,6 +107,11 @@ export const InvestorDashboard = () => {
         if (!batchExecuted) {
             setIsModalOpen(true);
         }
+    };
+
+    const dismissWelcomeBanner = () => {
+        setShowWelcomeBanner(false);
+        localStorage.setItem('fp_welcome_dismissed', 'true');
     };
 
     const convertToCSV = (data: any[]) => {
@@ -169,7 +172,7 @@ export const InvestorDashboard = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-white tracking-tight mb-2">Weekly Output</h1>
+                    <h1 className="text-3xl font-bold text-white tracking-tight mb-2 uppercase">Weekly Output</h1>
                     <div className="flex items-center gap-3">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 tracking-wider">
                             ENGINE STATUS: SYNCED
@@ -181,12 +184,62 @@ export const InvestorDashboard = () => {
                 </div>
             </div>
 
-            {/* Row 1: Primary Action & Hot Sheet */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            {/* Welcome Banner */}
+            {showWelcomeBanner && (
+                <div className="relative p-6 bg-[#111111] border border-emerald-500/30 rounded-2xl overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 blur-[80px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+                    <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-sm font-bold text-emerald-500 uppercase tracking-widest flex items-center gap-2">
+                                👋 Welcome to FirstPulse
+                            </h3>
+                            <button onClick={dismissWelcomeBanner} className="text-gray-500 hover:text-white transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <p className="text-white text-lg font-medium mb-6">Your weekly marketing list is ready. Here's how it works:</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                             {[
+                                 { text: "Review your numbers below", desc: "(Fresh = new leads, Repeat = follow-ups, Queue = backfill)" },
+                                 { text: "Click \"Download Weekly Batch\"", desc: "To get your marketing list" },
+                                 { text: "Execute your marketing", desc: "(mail, call, text) on those contacts" },
+                                 { text: "Come back next week", desc: "For your next automated batch" }
+                             ].map((step, i) => (
+                                 <div key={i} className="flex gap-4">
+                                     <div className="w-6 h-6 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-[10px] font-bold text-emerald-500 shrink-0">
+                                         {i + 1}
+                                     </div>
+                                     <div>
+                                         <div className="text-sm font-bold text-white">{step.text}</div>
+                                         <div className="text-xs text-gray-500">{step.desc}</div>
+                                     </div>
+                                 </div>
+                             ))}
+                        </div>
+                        <div className="flex gap-4">
+                            <Link 
+                                to="/investor/how-it-works"
+                                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-black font-bold rounded-lg text-xs uppercase tracking-wider transition-all flex items-center gap-2"
+                            >
+                                Learn More
+                                <ArrowRight size={14} />
+                            </Link>
+                            <button 
+                                onClick={dismissWelcomeBanner}
+                                className="px-6 py-2.5 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white font-bold rounded-lg text-xs uppercase tracking-wider transition-all"
+                            >
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Main Strategy Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
-                {/* Left Card: Primary Strategy Action */}
-                <Card className="lg:col-span-3 bg-[#111111] border-white/10 relative overflow-hidden group h-full">
-                     {/* Subtle gradient bg */}
+                {/* Export Card */}
+                <Card className="lg:col-span-2 bg-[#111111] border-white/10 relative overflow-hidden group h-full">
                      <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/5 blur-[100px] rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
                      
                     <div className="p-8 flex flex-col h-full justify-between">
@@ -202,9 +255,9 @@ export const InvestorDashboard = () => {
                             </div>
 
                             <div className="grid grid-cols-3 gap-8 mb-10">
-                                <Counter label="FRESH" value={latestBatch ? latestBatch.freshCount.toString() : "--"} brightness="text-white" />
-                                <Counter label="REPEAT" value={latestBatch ? latestBatch.repeatCount.toString() : "--"} brightness="text-gray-400" />
-                                <Counter label="QUEUE" value={latestBatch ? latestBatch.queueCount.toString() : "--"} brightness="text-gray-600" />
+                                <Counter label="FRESH" sublabel="New leads this week" value={latestBatch ? latestBatch.freshCount.toString() : "--"} brightness="text-white" />
+                                <Counter label="REPEAT" sublabel="Follow-up contacts" value={latestBatch ? latestBatch.repeatCount.toString() : "--"} brightness="text-gray-400" />
+                                <Counter label="QUEUE" sublabel="Backfill from pool" value={latestBatch ? latestBatch.queueCount.toString() : "--"} brightness="text-gray-600" />
                             </div>
                         </div>
 
@@ -220,11 +273,11 @@ export const InvestorDashboard = () => {
                             {batchExecuted ? (
                                 <>
                                     <CheckCircle2 size={18} />
-                                    <span className="tracking-wide">BATCH COMPLETED</span>
+                                    <span className="tracking-wide uppercase">Batch Completed</span>
                                 </>
                             ) : (
                                 <>
-                                    <span className="tracking-wide">DOWNLOAD WEEKLY BATCH</span>
+                                    <span className="tracking-wide uppercase">Download Weekly Batch</span>
                                     <ArrowRight size={18} />
                                 </>
                             )}
@@ -232,8 +285,8 @@ export const InvestorDashboard = () => {
                     </div>
                 </Card>
 
-                {/* Right Card: Hot Sheet */}
-                <Link to="/investor/lead-monitor?filter=blitz&status=active" className="lg:col-span-2 block h-full group cursor-pointer">
+                {/* Hot Sheet Card */}
+                <Link to="/investor/lead-monitor?filter=blitz&status=active" className="block h-full group cursor-pointer">
                     <Card className="bg-[#111111] border-amber-500/20 relative overflow-hidden h-full group-hover:border-amber-500/40 transition-colors">
                         <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-transparent to-transparent pointer-events-none" />
                         
@@ -265,70 +318,20 @@ export const InvestorDashboard = () => {
                 </Link>
             </div>
 
-            {/* Row 2: Lane Breakdown */}
+            {/* Lane Breakdown Section */}
             <div>
-                 <div className="text-xs font-bold text-gray-500 tracking-widest uppercase mb-4 ml-1">Lane Breakdown</div>
-                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <LaneCard label="BLITZ" value={latestBatch ? latestBatch.blitzCount.toString() : '--'} dotColor="bg-amber-500" />
-                    <LaneCard label="CHASE" value={latestBatch ? latestBatch.chaseCount.toString() : '--'} dotColor="bg-indigo-500" />
-                    <LaneCard label="NURTURE" value={latestBatch ? latestBatch.nurtureCount.toString() : '--'} dotColor="bg-gray-500" />
-                    
-                    <Card className="bg-[#111111] border-emerald-500/20 flex items-center justify-center p-4">
-                        <div className="text-center py-2">
-                            <div className="flex justify-center mb-3 text-emerald-500">
-                                <CheckCircle2 size={28} />
-                            </div>
-                            <div className="text-sm font-bold text-emerald-500 tracking-wider mb-1">LOGIC FINALIZED</div>
-                            <div className="text-[10px] text-gray-500 font-mono leading-tight">MARKET-WIDE VALIDATION<br/>SEQUENCE COMPLETE</div>
-                        </div>
-                    </Card>
-                 </div>
-            </div>
-
-            {/* Row 3: Regional Velocity & Sold Pulse */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Regional Velocity */}
-                <div className="lg:col-span-2">
-                     <div className="flex items-center gap-2 mb-4 ml-1">
-                          <Map size={16} className="text-gray-500" />
-                          <h3 className="text-xs font-bold text-gray-500 tracking-widest uppercase">Regional Velocity</h3>
-                     </div>
-                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                          {VELOCITY_DATA.map(item => (
-                              <Card key={item.zip} className={`bg-[#111111] border ${item.border} p-3 flex flex-col items-center justify-center text-center hover:bg-white/5 transition-colors`}>
-                                  <div className="text-lg font-mono font-bold text-white mb-1">{item.zip}</div>
-                                  <div className={`text-[10px] font-bold ${item.text} ${item.bg} px-2 py-0.5 rounded border ${item.border} uppercase`}>
-                                      {item.status}
-                                  </div>
-                              </Card>
-                          ))}
-                     </div>
-                </div>
-                
-                {/* Sold Pulse */}
-                <div className="space-y-4">
-                    <div className="flex items-center gap-2 mb-4 ml-1">
-                        <TrendingUp size={16} className="text-gray-500" />
-                        <h3 className="text-xs font-bold text-gray-500 tracking-widest uppercase">Sold Pulse</h3>
+                 <div className="flex items-center justify-between mb-4 px-1">
+                    <div className="text-xs font-bold text-gray-500 tracking-widest uppercase">Lane Breakdown</div>
+                    <div className="flex items-center gap-2 bg-emerald-500/5 border border-emerald-500/10 px-2 py-1 rounded">
+                        <CheckCircle2 size={12} className="text-emerald-500" />
+                        <span className="text-[10px] font-bold text-emerald-500/80 uppercase tracking-widest">Logic Finalized</span>
                     </div>
-                    <Card className="bg-[#111111] border-white/5 p-0 overflow-hidden">
-                        {SOLD_PULSE_DATA.map((item, i) => (
-                            <div key={i} className="p-4 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors flex justify-between items-center">
-                                <div>
-                                    <div className="text-sm font-bold text-white">{item.address}</div>
-                                    <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                                        <Clock size={10} />
-                                        {item.time}
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    <div className="text-sm font-mono font-bold text-emerald-500">${item.price.toLocaleString()}</div>
-                                    <div className="text-[10px] text-gray-600 font-bold uppercase">Sold</div>
-                                </div>
-                            </div>
-                        ))}
-                    </Card>
-                </div>
+                 </div>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <LaneCard label="BLITZ" sublabel="Urgent - time sensitive" value={latestBatch ? latestBatch.blitzCount.toString() : '--'} dotColor="bg-amber-500" />
+                    <LaneCard label="CHASE" sublabel="Active - needs follow-up" value={latestBatch ? latestBatch.chaseCount.toString() : '--'} dotColor="bg-indigo-500" />
+                    <LaneCard label="NURTURE" sublabel="Long-term prospects" value={latestBatch ? latestBatch.nurtureCount.toString() : '--'} dotColor="bg-gray-500" />
+                 </div>
             </div>
 
             {/* Modal for Execution */}
@@ -412,7 +415,7 @@ export const InvestorDashboard = () => {
                     <div className="p-4 bg-rose-950/20 border border-rose-500/30 rounded-xl flex gap-3">
                          <AlertTriangle className="text-rose-500 shrink-0" size={20} />
                          <div className="text-xs text-rose-200/80 leading-relaxed">
-                             <strong className="text-rose-400 block mb-1">Execution Lock-In</strong>
+                             <strong className="text-rose-400 block mb-1 uppercase tracking-tight">Execution Lock-In</strong>
                              Once downloaded, touch counts are permanently incremented and cadence timers begin. This action cannot be undone.
                          </div>
                     </div>
@@ -442,14 +445,14 @@ export const InvestorDashboard = () => {
                     <div className="grid grid-cols-2 gap-4 pt-4">
                         <button 
                             onClick={() => setIsModalOpen(false)}
-                            className="py-3 rounded-lg border border-white/10 text-gray-400 font-bold text-sm hover:bg-white/5 transition-colors"
+                            className="py-3 rounded-lg border border-white/10 text-gray-400 font-bold text-sm hover:bg-white/5 transition-colors uppercase tracking-wider"
                         >
                             Cancel
                         </button>
                         <button 
                             onClick={executeBatch}
                             disabled={!isConfirmed || isProcessing || (includeSkipTrace && traceEstimate && walletBalance < traceEstimate.totalCost)}
-                            className={`py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-colors ${
+                            className={`py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-colors uppercase tracking-wider ${
                                 !isConfirmed || isProcessing || (includeSkipTrace && traceEstimate && walletBalance < traceEstimate.totalCost)
                                 ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
                                 : 'bg-emerald-600 hover:bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'

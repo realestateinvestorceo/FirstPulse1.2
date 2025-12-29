@@ -12,6 +12,7 @@ import { SystemConfig } from './pages/admin/SystemConfig';
 import { PartnerClients } from './pages/partner/Clients';
 import { ClientDetail } from './pages/partner/ClientDetail';
 import { PartnerPricing } from './pages/partner/Pricing';
+import { PartnerRevenue } from './pages/partner/Revenue';
 import { InvestorDashboard } from './pages/investor/Dashboard';
 import { LeadMonitor } from './pages/investor/LeadMonitor';
 import { StrategyEngine } from './pages/investor/StrategyEngine';
@@ -103,6 +104,7 @@ const App = () => {
                   <Route path="clients" element={<PartnerClients />} />
                   <Route path="clients/:id" element={<ClientDetail />} />
                   <Route path="pricing" element={<PartnerPricing />} />
+                  <Route path="revenue" element={<PartnerRevenue />} />
                   <Route path="settings" element={<PlaceholderPage title="Partner Settings" />} />
                   <Route path="reports" element={<PlaceholderPage title="Performance Reports" />} />
                 </Routes>

@@ -18,7 +18,9 @@ import {
   Clock,
   Radio,
   Map,
-  DollarSign
+  DollarSign,
+  TrendingUp,
+  BookOpen
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -79,12 +81,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       case 'partner':
         return [
           { to: '/partner/clients', icon: Users, label: 'My Clients' },
+          { to: '/partner/revenue', icon: TrendingUp, label: 'Revenue' },
           { to: '/partner/pricing', icon: DollarSign, label: 'Pricing' },
           { to: '/partner/settings', icon: Settings, label: 'Settings' },
         ];
       case 'investor':
         return [
           { to: '/investor/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+          { to: '/investor/how-it-works', icon: BookOpen, label: 'How It Works' },
           { to: '/investor/lead-monitor', icon: Activity, label: 'Lead Monitor' },
           { to: '/investor/strategy-engine', icon: GitBranch, label: 'Strategy Engine' },
           { to: '/investor/suppression', icon: ShieldAlert, label: 'Suppression' },
