@@ -1,4 +1,4 @@
-import React, { Component, ErrorInfo, ReactNode } from "react";
+import React, { ErrorInfo, ReactNode } from "react";
 import { AlertTriangle, RefreshCcw } from "lucide-react";
 
 interface Props {
@@ -10,9 +10,9 @@ interface State {
   error: Error | null;
 }
 
-// Inheriting from Component with explicit generics to ensure 'props' and 'state' are correctly recognized by the TypeScript compiler.
-// Fix: Explicitly importing and extending Component from React to ensure members like 'props' and 'state' are correctly typed and accessible on 'this'.
-export class ErrorBoundary extends Component<Props, State> {
+// Inheriting from React.Component with explicit generics to ensure 'props' and 'state' are correctly recognized by the TypeScript compiler.
+// Fix: Explicitly using React.Component ensures 'props' and 'state' are correctly inherited and accessible within the class.
+export class ErrorBoundary extends React.Component<Props, State> {
   public state: State = {
     hasError: false,
     error: null

@@ -156,6 +156,11 @@ const seedClientSettings = () => {
   ];
 };
 
+const randomTagsWithBias = (id: number) => {
+  if (id === 99) return ['foreclosure', 'vacant'];
+  return randomTags();
+}
+
 const runScoringEngine = () => {
   const investorId = 201;
   const targetProperties = properties;
@@ -277,7 +282,7 @@ export const initializeDatabase = () => {
       addressState: loc.state,
       addressPostalCode: (loc.zipBase + randomInt(1, 99)).toString(),
       propertyType: randomPick(PROPERTY_TYPES),
-      tags: randomTags(),
+      tags: i === 99 ? ['foreclosure', 'vacant'] : randomTags(),
       estimatedValue: randomInt(150000, 850000),
       equityPercent: randomInt(10, 100),
       createdAt: new Date().toISOString(),
@@ -567,16 +572,37 @@ export const api = {
   },
 
   getBatchSkipTraceEstimates: async (clientId: number) => {
-      const batch = weeklyBatches.filter(b => b.clientId === clientId && b.status === BatchStatus.Generated).sort((a, b) => b.id - a.id)[0];
-      if (!batch) return null;
       const client = clients.find(c => c.id === clientId);
-      const partnerConfigs = await api.getPartnerConfig(client?.partnerId || 0);
+      if (!client) return null;
+
+      // Find 'Generated' batch if it exists
+      const batch = weeklyBatches
+        .filter(b => b.clientId === clientId && b.status === BatchStatus.Generated)
+        .sort((a, b) => b.id - a.id)[0];
+      
+      const partnerConfigs = await api.getPartnerConfig(client.partnerId || 0);
       const rateStr = partnerConfigs.find(c => c.settingKey === 'skip_trace_rate')?.settingValue;
       const rate = rateStr ? parseFloat(rateStr) : 0.06;
-      const activeTracks = clientRecordTrackings.filter(t => t.clientId === clientId && t.status === TrackingStatus.Active).sort((a,b) => b.finalAllocationPoints - a.finalAllocationPoints).slice(0, batch.totalRecords);
+
+      // Determine target records to estimate against. If a batch is generated, use its size.
+      // Otherwise, assume the client's current weekly capacity for the upcoming batch.
+      const targetCount = batch ? batch.totalRecords : client.weeklyCapacity;
+
+      // Fetch active tracks that would be included in an execution
+      const activeTracks = clientRecordTrackings
+        .filter(t => t.clientId === clientId && t.status === TrackingStatus.Active)
+        .sort((a,b) => b.finalAllocationPoints - a.finalAllocationPoints)
+        .slice(0, targetCount);
+
       const sixMonthsAgo = new Date(Date.now() - 1000 * 60 * 60 * 24 * 180);
       const eligibleCount = activeTracks.filter(t => !t.skipTracedAt || new Date(t.skipTracedAt) < sixMonthsAgo).length;
-      return { eligibleCount, alreadyTracedCount: batch.totalRecords - eligibleCount, rate, totalCost: eligibleCount * rate };
+
+      return { 
+        eligibleCount, 
+        alreadyTracedCount: activeTracks.length - eligibleCount, 
+        rate, 
+        totalCost: eligibleCount * rate 
+      };
   },
 
   getClients: async (partnerId?: number) => partnerId ? clients.filter(c => c.partnerId === partnerId) : clients,
